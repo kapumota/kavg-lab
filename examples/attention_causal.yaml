@@ -1,0 +1,33 @@
+# Demostración de atención causal tipo LLM autoregresivo.
+dimension: 3
+temperature: 1.0
+kernel_gamma: 1.0
+top_k: 2
+
+attention_solver:
+  method: projected-gradient
+  initial_step: 0.10
+  tolerance: 1e-8
+  min_step: 1e-10
+  max_iterations: 5000
+
+mask:
+  type: causal
+
+queries:
+  - [1.0, 0.0, 0.0]
+  - [0.4, 1.0, 0.0]
+  - [0.2, 0.3, 1.0]
+  - [0.7, 0.7, 0.2]
+
+keys:
+  - [1.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0]
+  - [0.0, 0.0, 1.0]
+  - [0.7, 0.7, 0.2]
+
+values:
+  - [1.0, 0.0]
+  - [0.0, 1.0]
+  - [0.5, 0.5]
+  - [0.8, 0.2]

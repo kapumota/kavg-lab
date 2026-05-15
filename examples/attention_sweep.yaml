@@ -1,0 +1,41 @@
+# Agente experimental sobrio: prueba configuraciones y las ordena por un objetivo.
+objective: balanced-tradeoff
+output_limit: 8
+
+gamma_values: [0.0, 0.5, 1.0, 2.0]
+temperature_values: [0.7, 1.0, 1.5]
+
+priors:
+  - name: uniform
+    values: [0.25, 0.25, 0.25, 0.25]
+  - name: region-biased
+    values: [0.15, 0.15, 0.20, 0.50]
+
+base_attention:
+  dimension: 3
+  temperature: 1.0
+  kernel_gamma: 1.0
+  top_k: 2
+
+  attention_solver:
+    method: projected-gradient
+    initial_step: 0.12
+    tolerance: 1e-8
+    min_step: 1e-10
+    max_iterations: 4000
+
+  queries:
+    - [1.0, 0.2, 0.0]
+    - [0.0, 1.0, 0.4]
+
+  keys:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+    - [0.7, 0.7, 0.0]
+
+  values:
+    - [1.0, 0.0]
+    - [0.0, 1.0]
+    - [0.5, 0.5]
+    - [0.8, 0.8]

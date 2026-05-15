@@ -1,0 +1,31 @@
+dimension: 2
+lambda1: 0.5
+
+# f1(x) = 1/2 ||x||². Su conjugado también es 1/2 ||s||².
+f1:
+  type: quadratic
+  matrix:
+    - [1.0, 0.0]
+    - [0.0, 1.0]
+  vector: [0.0, 0.0]
+
+# f2(x) = 1/2 ||x||². Su conjugado también es 1/2 ||s||².
+f2:
+  type: l2
+  alpha: 1.0
+
+kernel:
+  type: squared-norm
+
+solver:
+  method: coordinate-descent
+  initial_step: 1.0
+  tolerance: 0.000001
+  min_step: 0.000001
+  max_iterations: 200
+
+# En verify-fenchel estos puntos se interpretan como puntos duales s.
+points:
+  - [1.0, 0.0]
+  - [0.5, -1.0]
+  - [2.0, 1.5]

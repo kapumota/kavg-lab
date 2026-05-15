@@ -1,0 +1,43 @@
+# Demostracion multi-head: varias cabeceras con priors, gamma y temperatures distintos.
+dimension: 3
+top_k: 2
+
+default_attention_solver:
+  method: projected-gradient
+  initial_step: 0.12
+  tolerance: 1e-8
+  min_step: 1e-10
+  max_iterations: 5000
+
+default_mask:
+  type: none
+
+queries:
+  - [1.0, 0.2, 0.0]
+  - [0.0, 1.0, 0.4]
+
+keys:
+  - [1.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0]
+  - [0.0, 0.0, 1.0]
+  - [0.7, 0.7, 0.0]
+
+values:
+  - [1.0, 0.0]
+  - [0.0, 1.0]
+  - [0.5, 0.5]
+  - [0.8, 0.8]
+
+heads:
+  - name: lexical-head
+    temperature: 0.8
+    kernel_gamma: 0.5
+    prior: [0.35, 0.25, 0.20, 0.20]
+  - name: structural-head
+    temperature: 1.2
+    kernel_gamma: 1.5
+    prior: [0.15, 0.15, 0.20, 0.50]
+  - name: exploratory-head
+    temperature: 1.8
+    kernel_gamma: 0.2
+    prior: [0.25, 0.25, 0.25, 0.25]

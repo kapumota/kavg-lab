@@ -1,0 +1,32 @@
+# Prototipo MLLM: cross-attention texto-imagen con embeddings pequeños.
+# `text_queries`, `image_keys` e `image_values` son alias de queries, keys y values.
+dimension: 4
+temperature: 0.9
+kernel_gamma: 1.2
+top_k: 2
+
+attention_solver:
+  method: projected-gradient
+  initial_step: 0.10
+  tolerance: 1e-8
+  min_step: 1e-10
+  max_iterations: 5000
+
+text_queries:
+  - [1.0, 0.2, 0.0, 0.1]   # token textual: "perro"
+  - [0.0, 0.1, 1.0, 0.3]   # token textual: "pelota"
+
+image_keys:
+  - [0.9, 0.1, 0.0, 0.0]   # región imagen 1
+  - [0.2, 0.8, 0.1, 0.0]   # región imagen 2
+  - [0.0, 0.2, 0.9, 0.3]   # región imagen 3
+  - [0.4, 0.4, 0.4, 0.8]   # región global
+
+image_values:
+  - [1.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0]
+  - [0.0, 0.0, 1.0]
+  - [0.5, 0.5, 0.5]
+
+# Prior de regiones visuales: se favorece la región global.
+prior: [0.20, 0.20, 0.20, 0.40]
