@@ -106,13 +106,13 @@ Si `cargo` no se reconoce, cerrar y volver a abrir PowerShell. Rust instala las 
 ##### Linux, macOS o WSL
 
 ```bash
-cd kavg-lab-5
+cd kavg-lab
 ```
 
 ### Windows PowerShell
 
 ```powershell
-cd .\kavg-lab-5
+cd .\kavg-lab
 ```
 
 Verificar que exista el archivo principal de Cargo:
@@ -864,3 +864,85 @@ El agente experimental ordena configuraciones según el objetivo balanced-tradeo
 > implementada en el software permite reinterpretar una parte central de los Transformers como un problema de optimización: los pesos de atención no se calculan únicamente a partir de compatibilidades entre vectores, sino que también pueden incorporar priors, restricciones, máscaras y regularización.
 
 Esta perspectiva es relevante porque muchos sistemas modernos de IA combinan aprendizaje estadístico con restricciones estructurales. En LLMs, las máscaras causales imponen una estructura temporal, en MLLMs, la cross-attention conecta modalidades distintas y en agentes, la selección de configuraciones puede verse como un proceso de búsqueda guiada por métricas. KAvgLab no pretende reemplazar frameworks de deep learning, sino ofrecer un entorno pequeño, transparente y matemáticamente interpretable para estudiar estas ideas desde la optimización convexa.
+
+#### 16. Fase 1: profesionalización del CLI sin cambiar su esencia
+
+Esta versión conserva a KAvgLab como una herramienta de línea de comandos. La mejora principal no es visual, sino de ingeniería: estructura de repositorio más profesional, validación automática en GitHub Actions y trazabilidad de ejecuciones.
+
+##### 16.1 Estructura agregada
+
+```text
+.github/workflows/ci.yml
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+docs/fase-1-profesionalizacion-cli.md
+experiments/README.md
+sample_outputs/README.md
+LICENSE
+```
+
+##### 16.2 Validación local antes de subir a GitHub
+
+Como el proyecto se trabaja localmente y ya existe en GitHub, el flujo recomendado es crear una rama en español, sin prefijos como `feat`:
+
+```bash
+git switch -c fase-1-profesionalizacion-cli
+cargo fmt -- --check
+cargo check --all-targets
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+cargo build --release
+git status
+```
+
+Si todo pasa correctamente:
+
+```bash
+git add .
+git commit -m "Agrega fase 1 de profesionalizacion del CLI"
+git push -u origin fase-1-profesionalizacion-cli
+```
+
+Luego se abre un Pull Request hacia `main`.
+
+##### 16.3 Salida CSV, JSON y manifiesto
+
+La salida CSV anterior se mantiene. Además, `compute` puede generar JSON estructurado y un manifiesto de ejecución:
+
+```bash
+cargo run -- compute   --config examples/quadratic_l1.yaml   --output sample_outputs/results.csv   --json sample_outputs/results.json   --manifest sample_outputs/manifest.json
+```
+
+Cuando el binario está instalado o compilado en release:
+
+```bash
+./target/release/kavg-lab compute   --config examples/quadratic_l1.yaml   --output sample_outputs/results.csv   --json sample_outputs/results.json   --manifest sample_outputs/manifest.json
+```
+
+El archivo CSV sirve para análisis tabular. El JSON sirve para auditoría automática. El manifiesto registra versión del binario, comando ejecutado, ruta de configuración, hash FNV-1a de la configuración, cantidad de resultados y duración de ejecución.
+
+##### 16.4 Artefactos generados que no se deben subir
+
+Por defecto, `.gitignore` evita subir resultados generados en `sample_outputs/`:
+
+```text
+sample_outputs/*.csv
+sample_outputs/*.json
+```
+
+El archivo que sí se mantiene versionado es `sample_outputs/README.md`, porque documenta la convención de salidas.
+
+##### 16.5 CI en GitHub
+
+El workflow `.github/workflows/ci.yml` ejecuta:
+
+```bash
+cargo fmt -- --check
+cargo check --all-targets
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+cargo build --release
+```
+
+Esto permite que cada `push` a `main` y cada Pull Request validen que el CLI compila, mantiene formato, pasa pruebas y genera un binario release.
