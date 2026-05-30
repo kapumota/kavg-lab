@@ -1,0 +1,31 @@
+name: Validacion Rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mostrar version de Rust
+        run: rustc --version && cargo --version
+
+      - name: Formato
+        run: cargo fmt -- --check
+
+      - name: Compilacion rapida
+        run: cargo check --all-targets
+
+      - name: Lint con Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Pruebas
+        run: cargo test --all-targets
+
+      - name: Build release
+        run: cargo build --release

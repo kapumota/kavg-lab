@@ -13,16 +13,25 @@ use kavg_lab::io::csv_export::{
     export_agent_sweep_results, export_attention_results, export_comparison, export_fenchel_checks,
     export_multihead_results, export_results,
 };
+use kavg_lab::io::json_export::{
+    export_compute_results_json, export_execution_manifest, ExecutionManifest,
+};
 use kavg_lab::kernels::build_kernel;
 use kavg_lab::optimization::averages::AverageKind;
 use kavg_lab::optimization::comparison::compare_averages;
 use kavg_lab::optimization::kernel_average::{solve_kernel_average, KernelAverageInput};
+use std::time::SystemTime;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Compute { config, output } => run_compute(&config, output)?,
+        Commands::Compute {
+            config,
+            output,
+            json_output,
+            manifest,
+        } => run_compute(&config, output, json_output, manifest)?,
         Commands::Compare { config, output } => run_compare(&config, output)?,
         Commands::VerifyFenchel { config, output } => run_verify_fenchel(&config, output)?,
         Commands::AttentionDemo { config, output } => run_attention_demo_command(&config, output)?,
@@ -35,7 +44,13 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_compute(config: &std::path::Path, output: Option<std::path::PathBuf>) -> Result<()> {
+fn run_compute(
+    config: &std::path::Path,
+    output: Option<std::path::PathBuf>,
+    json_output: Option<std::path::PathBuf>,
+    manifest: Option<std::path::PathBuf>,
+) -> Result<()> {
+    let started_at = SystemTime::now();
     let experiment = ExperimentConfig::from_yaml_file(config)?;
     let f1 = build_function(&experiment.f1)?;
     let f2 = build_function(&experiment.f2)?;
@@ -80,9 +95,32 @@ fn run_compute(config: &std::path::Path, output: Option<std::path::PathBuf>) -> 
         results.push(result.with_index_and_point(index, point.clone()));
     }
 
-    if let Some(path) = output {
-        export_results(&path, &results)?;
-        println!("Resultados exportados a: {}", path.display());
+    if let Some(path) = output.as_ref() {
+        export_results(path, &results)?;
+        println!("Resultados CSV exportados a: {}", path.display());
+    }
+
+    if let Some(path) = json_output.as_ref() {
+        export_compute_results_json(path, &results)?;
+        println!("Resultados JSON exportados a: {}", path.display());
+    }
+
+    if let Some(path) = manifest.as_ref() {
+        let finished_at = SystemTime::now();
+        export_execution_manifest(
+            path,
+            &ExecutionManifest {
+                command: "compute",
+                config_path: config,
+                csv_output: output.as_deref(),
+                json_output: json_output.as_deref(),
+                started_at,
+                finished_at,
+                result_count: results.len(),
+                status: "passed",
+            },
+        )?;
+        println!("Manifiesto exportado a: {}", path.display());
     }
 
     Ok(())

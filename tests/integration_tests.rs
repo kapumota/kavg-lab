@@ -211,3 +211,69 @@ fn verify_fenchel_quadratic_l2_runs_with_real_yaml() {
         );
     }
 }
+
+#[test]
+fn compute_results_can_be_exported_as_json_and_manifest() {
+    use kavg_lab::io::json_export::{
+        export_compute_results_json, export_execution_manifest, ExecutionManifest,
+    };
+    use std::time::SystemTime;
+
+    let experiment = ExperimentConfig::from_yaml_file(&example("quadratic_l1.yaml"))
+        .expect("quadratic_l1.yaml debe parsear");
+    let f1 = build_function(&experiment.f1).expect("f1 debe construirse");
+    let f2 = build_function(&experiment.f2).expect("f2 debe construirse");
+    let kernel = build_kernel(&experiment.kernel).expect("kernel debe construirse");
+
+    let mut results = Vec::new();
+    for (index, point) in experiment.points.iter().enumerate() {
+        let result = solve_kernel_average(KernelAverageInput {
+            f1: f1.as_ref(),
+            f2: f2.as_ref(),
+            kernel: kernel.as_ref(),
+            lambda1: experiment.lambda1,
+            x: point,
+            solver: &experiment.solver,
+            average_kind: AverageKind::Kernel,
+        })
+        .expect("compute quadratic_l1 debe resolver cada punto")
+        .with_index_and_point(index, point.clone());
+        results.push(result);
+    }
+
+    let json_path = std::env::temp_dir().join(format!(
+        "kavg_lab_compute_results_{}.json",
+        std::process::id()
+    ));
+    let manifest_path = std::env::temp_dir().join(format!(
+        "kavg_lab_compute_manifest_{}.json",
+        std::process::id()
+    ));
+
+    export_compute_results_json(&json_path, &results).expect("debe exportar JSON");
+    export_execution_manifest(
+        &manifest_path,
+        &ExecutionManifest {
+            command: "compute",
+            config_path: &example("quadratic_l1.yaml"),
+            csv_output: None,
+            json_output: Some(&json_path),
+            started_at: SystemTime::now(),
+            finished_at: SystemTime::now(),
+            result_count: results.len(),
+            status: "passed",
+        },
+    )
+    .expect("debe exportar manifiesto");
+
+    let json_text = fs::read_to_string(&json_path).expect("debe leer JSON");
+    let manifest_text = fs::read_to_string(&manifest_path).expect("debe leer manifiesto");
+
+    assert!(json_text.contains("\"command\": \"compute\""));
+    assert!(json_text.contains("\"results\""));
+    assert!(manifest_text.contains("\"config_hash_fnv1a64\""));
+    assert!(manifest_text.contains("\"result_count\""));
+
+    let _ = fs::remove_file(json_path);
+    let _ = fs::remove_file(manifest_path);
+}

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 /// CLI  para experimentar con promedios kernel, OSQP y atención regularizada.
 #[derive(Parser, Debug)]
 #[command(name = "kavg-lab")]
-#[command(version = "0.4.2")]
+#[command(version)]
 #[command(
     about = "Calcula, compara y verifica promedios kernel; incluye demos tipo Transformer/IA"
 )]
@@ -37,6 +37,14 @@ pub enum Commands {
         /// Ruta opcional para exportar resultados en CSV.
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Ruta opcional para exportar resultados estructurados en JSON.
+        #[arg(long = "json")]
+        json_output: Option<PathBuf>,
+
+        /// Ruta opcional para exportar un manifiesto reproducible de la ejecución.
+        #[arg(long)]
+        manifest: Option<PathBuf>,
     },
 
     /// Compara promedio aritmético, epigráfico y proximal average.
