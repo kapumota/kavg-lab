@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use kavg_lab::config::AttentionSolverMethod;
 use std::path::PathBuf;
 
 /// CLI  para experimentar con promedios kernel, OSQP y atención regularizada.
@@ -58,6 +59,21 @@ pub enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Compara varios solvers sobre el mismo experimento YAML.
+    CompareSolvers {
+        /// Ruta del archivo de configuración YAML.
+        #[arg(short, long)]
+        config: PathBuf,
+
+        /// Lista separada por comas: coordinate-descent,subgradient,osqp,proximal-gradient,fista,admm.
+        #[arg(long, value_delimiter = ',')]
+        solvers: Vec<String>,
+
+        /// Ruta opcional para exportar la comparación en CSV.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+
     /// Verifica numéricamente la identidad de Fenchel del kernel average.
     VerifyFenchel {
         /// Ruta del archivo de configuración YAML.
@@ -74,6 +90,10 @@ pub enum Commands {
         /// Ruta del archivo de configuración YAML de atención.
         #[arg(short, long)]
         config: PathBuf,
+
+        /// Sobrescribe el solver del YAML: projected-gradient, mirror-descent o frank-wolfe.
+        #[arg(long)]
+        solver: Option<AttentionSolverMethod>,
 
         /// Ruta opcional para exportar los resultados en CSV.
         #[arg(short, long)]

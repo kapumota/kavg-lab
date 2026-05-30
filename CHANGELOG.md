@@ -1,5 +1,21 @@
 # Registro de cambios
 
+## [0.7.0] - Fase 3: solvers y comparación algorítmica
+
+### Agregado
+
+- Nuevos métodos para promedios kernel: `proximal-gradient`, `fista` y `admm`.
+- Nuevos métodos para atención sobre simplex: `mirror-descent` y `frank-wolfe`, manteniendo `projected-gradient`.
+- Nuevo comando `compare-solvers` para comparar varios métodos sobre el mismo YAML.
+- Opción `--solver` en `attention-demo` para sobrescribir el solver del YAML desde CLI.
+- Documentación de Fase 3 en `docs/fase-3-solvers-algoritmos.md`.
+- Ejemplos YAML para comparación de solvers y atención con mirror descent.
+
+### Mantenido
+
+- El proyecto sigue siendo un CLI puro.
+- No se agrega dashboard, servidor ni interfaz gráfica.
+
 ## [0.6.0] - Fase 2: matematica convexa ampliada
 
 ### Agregado
