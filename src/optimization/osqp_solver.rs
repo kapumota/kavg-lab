@@ -9,6 +9,7 @@ const INF: f64 = 1.0e20;
 /// Resultado mínimo que el backend OSQP entrega al solver principal.
 pub struct OsqpAverageSolution {
     pub y1: Vec<f64>,
+    pub y2: Vec<f64>,
     pub iterations: usize,
     pub metric: f64,
 }
@@ -33,10 +34,12 @@ pub fn solve_with_osqp(
         .context("OSQP no soporta f1 en esta configuración.")?;
     let f2_kind = SupportedFunction::from_function(input.f2, n)
         .context("OSQP no soporta f2 en esta configuración.")?;
-    let kernel_form = input
-        .kernel
-        .quadratic_form(n)
-        .with_context(|| format!("OSQP requiere un kernel cuadrático; kernel actual: {}", input.kernel.name()))?;
+    let kernel_form = input.kernel.quadratic_form(n).with_context(|| {
+        format!(
+            "OSQP requiere un kernel cuadrático; kernel actual: {}",
+            input.kernel.name()
+        )
+    })?;
 
     let t1_offset = if f1_kind.l1_alpha.is_some() {
         Some(2 * n)
@@ -111,8 +114,24 @@ pub fn solve_with_osqp(
         add_l1_constraints(&mut a_rows, &mut lower, &mut upper, var_count, n, offset, n);
     }
 
-    add_function_constraints(&mut a_rows, &mut lower, &mut upper, var_count, 0, n, &f1_kind);
-    add_function_constraints(&mut a_rows, &mut lower, &mut upper, var_count, n, n, &f2_kind);
+    add_function_constraints(
+        &mut a_rows,
+        &mut lower,
+        &mut upper,
+        var_count,
+        0,
+        n,
+        &f1_kind,
+    );
+    add_function_constraints(
+        &mut a_rows,
+        &mut lower,
+        &mut upper,
+        var_count,
+        n,
+        n,
+        &f2_kind,
+    );
 
     let p_iter = p_dense.iter().flat_map(|row| row.iter().copied());
     let a_iter = a_rows.iter().flat_map(|row| row.iter().copied());
@@ -136,6 +155,7 @@ pub fn solve_with_osqp(
     // Guardamos max_iterations como cota informativa y usamos el residuo de la restricción como métrica.
     Ok(OsqpAverageSolution {
         y1,
+        y2,
         iterations: input.solver.max_iterations,
         metric: residual,
     })

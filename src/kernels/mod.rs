@@ -40,12 +40,13 @@ pub fn build_kernel(config: &KernelConfig) -> Result<Box<dyn KernelFunction>> {
         KernelConfig::WeightedSquaredNorm { weights } => {
             Ok(Box::new(WeightedSquaredNormKernel::new(weights.clone())?))
         }
-        KernelConfig::Mahalanobis { matrix } => Ok(Box::new(MahalanobisKernel::new(matrix.clone())?)),
+        KernelConfig::Mahalanobis { matrix } => {
+            Ok(Box::new(MahalanobisKernel::new(matrix.clone())?))
+        }
         KernelConfig::Huber { delta, weight } => Ok(Box::new(HuberKernel::new(*delta, *weight)?)),
-        KernelConfig::EntropyKl { reference, epsilon } => Ok(Box::new(EntropyKlKernel::new(
-            reference.clone(),
-            *epsilon,
-        )?)),
+        KernelConfig::EntropyKl { reference, epsilon } => {
+            Ok(Box::new(EntropyKlKernel::new(reference.clone(), *epsilon)?))
+        }
         KernelConfig::BregmanQuadratic { matrix, center } => Ok(Box::new(
             BregmanQuadraticKernel::new(matrix.clone(), center.clone())?,
         )),

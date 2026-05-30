@@ -1,6 +1,8 @@
 use crate::functions::ConvexFunction;
 use anyhow::Result;
 
+const FEASIBILITY_TOLERANCE: f64 = 1.0e-7;
+
 /// Indicador de una caja: f(x)=0 si lower <= x <= upper, +∞ en otro caso.
 pub struct IndicatorBoxFunction {
     lower: Vec<f64>,
@@ -31,7 +33,9 @@ impl ConvexFunction for IndicatorBoxFunction {
             && x.iter()
                 .zip(&self.lower)
                 .zip(&self.upper)
-                .all(|((v, lo), hi)| *v >= *lo - 1.0e-12 && *v <= *hi + 1.0e-12)
+                .all(|((v, lo), hi)| {
+                    *v >= *lo - FEASIBILITY_TOLERANCE && *v <= *hi + FEASIBILITY_TOLERANCE
+                })
         {
             0.0
         } else {

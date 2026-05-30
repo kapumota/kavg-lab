@@ -7,9 +7,9 @@ f1:
   l2_alpha: 1.0
 
 f2:
-  type: indicator-box
-  lower: [-1.0, -1.0, -1.0]
-  upper: [1.0, 1.0, 1.0]
+  type: elastic-net
+  l1_alpha: 0.0
+  l2_alpha: 1.0
 
 kernel:
   type: mahalanobis

@@ -13,8 +13,7 @@ mod quadratic;
 use crate::config::FunctionConfig;
 use anyhow::Result;
 pub use conjugates::{
-    build_conjugate_function, L1ConjugateFunction, L2ConjugateFunction,
-    QuadraticConjugateFunction,
+    build_conjugate_function, L1ConjugateFunction, L2ConjugateFunction, QuadraticConjugateFunction,
 };
 pub use elastic_net::ElasticNetFunction;
 pub use hinge_loss::HingeLossFunction;
@@ -81,10 +80,9 @@ pub fn build_function(config: &FunctionConfig) -> Result<Box<dyn ConvexFunction>
         FunctionConfig::IndicatorSimplex { tolerance } => {
             Ok(Box::new(IndicatorSimplexFunction::new(*tolerance)?))
         }
-        FunctionConfig::ElasticNet {
-            l1_alpha,
-            l2_alpha,
-        } => Ok(Box::new(ElasticNetFunction::new(*l1_alpha, *l2_alpha)?)),
+        FunctionConfig::ElasticNet { l1_alpha, l2_alpha } => {
+            Ok(Box::new(ElasticNetFunction::new(*l1_alpha, *l2_alpha)?))
+        }
         FunctionConfig::Huber { delta, weight } => {
             Ok(Box::new(HuberFunction::new(*delta, *weight)?))
         }

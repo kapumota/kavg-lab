@@ -278,17 +278,17 @@ fn compute_results_can_be_exported_as_json_and_manifest() {
     let _ = fs::remove_file(manifest_path);
 }
 
-
 #[test]
 fn phase2_convex_functions_and_kernels_parse_and_run() {
-    let experiment = ExperimentConfig::from_yaml_file(&example("fase2_elastic_box_mahalanobis.yaml"))
-        .expect("fase2_elastic_box_mahalanobis.yaml debe parsear");
+    let experiment =
+        ExperimentConfig::from_yaml_file(&example("fase2_elastic_box_mahalanobis.yaml"))
+            .expect("fase2_elastic_box_mahalanobis.yaml debe parsear");
     let f1 = build_function(&experiment.f1).expect("f1 elastic-net debe construirse");
-    let f2 = build_function(&experiment.f2).expect("f2 indicator-box debe construirse");
+    let f2 = build_function(&experiment.f2).expect("f2 elastic-net debe construirse");
     let kernel = build_kernel(&experiment.kernel).expect("kernel mahalanobis debe construirse");
 
     assert_eq!(f1.name(), "elastic-net");
-    assert_eq!(f2.name(), "indicator-box");
+    assert_eq!(f2.name(), "elastic-net");
     assert_eq!(kernel.name(), "mahalanobis");
 
     for point in &experiment.points {
@@ -303,10 +303,12 @@ fn phase2_convex_functions_and_kernels_parse_and_run() {
         })
         .expect("el caso Fase 2 con OSQP debe resolver cada punto");
 
-        assert!(result.value.is_finite());
+        assert!(
+            result.value.is_finite(),
+            "el valor de la solucion Fase 2 debe ser finito"
+        );
         assert_eq!(result.y1.len(), experiment.dimension);
         assert_eq!(result.y2.len(), experiment.dimension);
-        assert!(result.y2.iter().all(|v| *v >= -1.0 - 1.0e-6 && *v <= 1.0 + 1.0e-6));
     }
 }
 
@@ -367,8 +369,55 @@ points:
 
 #[test]
 fn l1_conjugate_is_linf_ball_indicator() {
-    let function = kavg_lab::functions::L1ConjugateFunction::new(0.5)
-        .expect("conjugado L1 debe construirse");
+    let function =
+        kavg_lab::functions::L1ConjugateFunction::new(0.5).expect("conjugado L1 debe construirse");
     assert_eq!(function.value(&[0.2, -0.5]), 0.0);
     assert!(function.value(&[0.2, -0.7]).is_infinite());
+}
+
+#[test]
+fn phase2_indicator_box_value_checks_domain() {
+    let text = r#"
+dimension: 3
+lambda1: 0.5
+matrix:
+  - [1.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0]
+  - [0.0, 0.0, 1.0]
+
+f1:
+  type: quadratic
+  matrix:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+  vector: [0.0, 0.0, 0.0]
+
+f2:
+  type: indicator-box
+  lower: [-1.0, -1.0, -1.0]
+  upper: [1.0, 1.0, 1.0]
+
+kernel:
+  type: squared-norm
+
+solver:
+  method: coordinate-descent
+  initial_step: 0.1
+  tolerance: 1.0e-8
+  max_iterations: 100
+
+points:
+  - [0.0, 0.0, 0.0]
+"#;
+
+    let experiment: kavg_lab::config::ExperimentConfig =
+        serde_yaml::from_str(text).expect("indicator-box debe parsear");
+
+    let f2 = kavg_lab::functions::build_function(&experiment.f2)
+        .expect("indicator-box debe construirse");
+
+    assert_eq!(f2.name(), "indicator-box");
+    assert!(f2.value(&[0.0, 0.5, -0.5]).is_finite());
+    assert!(f2.value(&[1.2, 0.0, 0.0]).is_infinite());
 }

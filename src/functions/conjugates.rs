@@ -136,7 +136,6 @@ impl ConvexFunction for L2ConjugateFunction {
     }
 }
 
-
 /// Conjugado de f(x)=alpha||x||₁.
 /// Es el indicador de la bola infinito: f*(s)=0 si ||s||∞ <= alpha, +∞ en otro caso.
 pub struct L1ConjugateFunction {

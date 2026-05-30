@@ -84,5 +84,4 @@ impl ConvexFunction for LogisticLossFunction {
         }
         grad
     }
-
 }

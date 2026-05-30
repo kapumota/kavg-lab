@@ -26,24 +26,13 @@ pub enum FunctionConfig {
     #[serde(rename = "l2")]
     L2 { alpha: f64 },
     #[serde(rename = "indicator-box")]
-    IndicatorBox {
-        lower: Vec<f64>,
-        upper: Vec<f64>,
-    },
+    IndicatorBox { lower: Vec<f64>, upper: Vec<f64> },
     #[serde(rename = "indicator-simplex")]
-    IndicatorSimplex {
-        tolerance: Option<f64>,
-    },
+    IndicatorSimplex { tolerance: Option<f64> },
     #[serde(rename = "elastic-net")]
-    ElasticNet {
-        l1_alpha: f64,
-        l2_alpha: f64,
-    },
+    ElasticNet { l1_alpha: f64, l2_alpha: f64 },
     #[serde(rename = "huber")]
-    Huber {
-        delta: f64,
-        weight: Option<f64>,
-    },
+    Huber { delta: f64, weight: Option<f64> },
     #[serde(rename = "hinge-loss")]
     HingeLoss {
         samples: Vec<Vec<f64>>,
@@ -77,10 +66,7 @@ pub enum KernelConfig {
     #[serde(rename = "mahalanobis")]
     Mahalanobis { matrix: Vec<Vec<f64>> },
     #[serde(rename = "huber")]
-    Huber {
-        delta: f64,
-        weight: Option<f64>,
-    },
+    Huber { delta: f64, weight: Option<f64> },
     #[serde(rename = "entropy-kl")]
     EntropyKl {
         reference: Option<Vec<f64>>,
@@ -229,12 +215,17 @@ impl ExperimentConfig {
                     anyhow::ensure!(*tol > 0.0, "{}: tolerance debe ser positiva.", label);
                 }
             }
-            FunctionConfig::ElasticNet {
-                l1_alpha,
-                l2_alpha,
-            } => {
-                anyhow::ensure!(*l1_alpha >= 0.0, "{}: l1_alpha debe ser no negativo.", label);
-                anyhow::ensure!(*l2_alpha >= 0.0, "{}: l2_alpha debe ser no negativo.", label);
+            FunctionConfig::ElasticNet { l1_alpha, l2_alpha } => {
+                anyhow::ensure!(
+                    *l1_alpha >= 0.0,
+                    "{}: l1_alpha debe ser no negativo.",
+                    label
+                );
+                anyhow::ensure!(
+                    *l2_alpha >= 0.0,
+                    "{}: l2_alpha debe ser no negativo.",
+                    label
+                );
             }
             FunctionConfig::Huber { delta, weight } => {
                 anyhow::ensure!(*delta > 0.0, "{}: delta debe ser positivo.", label);
@@ -267,9 +258,15 @@ impl ExperimentConfig {
                 }
             }
             FunctionConfig::MaxAffine { pieces } => {
-                anyhow::ensure!(!pieces.is_empty(), "{}: pieces no puede estar vacío.", label);
                 anyhow::ensure!(
-                    pieces.iter().all(|piece| piece.slope.len() == self.dimension),
+                    !pieces.is_empty(),
+                    "{}: pieces no puede estar vacío.",
+                    label
+                );
+                anyhow::ensure!(
+                    pieces
+                        .iter()
+                        .all(|piece| piece.slope.len() == self.dimension),
                     "{}: cada slope debe tener dimensión {}.",
                     label,
                     self.dimension
@@ -285,7 +282,11 @@ impl ExperimentConfig {
         samples: &[Vec<f64>],
         labels: &[f64],
     ) -> Result<()> {
-        anyhow::ensure!(!samples.is_empty(), "{}: samples no puede estar vacío.", label);
+        anyhow::ensure!(
+            !samples.is_empty(),
+            "{}: samples no puede estar vacío.",
+            label
+        );
         anyhow::ensure!(
             samples.len() == labels.len(),
             "{}: samples y labels deben tener la misma longitud.",
@@ -343,7 +344,10 @@ impl ExperimentConfig {
                     );
                 }
                 if let Some(epsilon) = epsilon {
-                    anyhow::ensure!(*epsilon > 0.0, "kernel.entropy-kl.epsilon debe ser positivo.");
+                    anyhow::ensure!(
+                        *epsilon > 0.0,
+                        "kernel.entropy-kl.epsilon debe ser positivo."
+                    );
                 }
             }
             KernelConfig::BregmanQuadratic { matrix, center } => {
@@ -485,7 +489,6 @@ pub enum AttentionMaskConfig {
 }
 
 impl AttentionMaskConfig {
-
     pub fn validate(&self, rows: usize, cols: usize) -> Result<()> {
         match self {
             AttentionMaskConfig::None => Ok(()),
