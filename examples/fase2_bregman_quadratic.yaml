@@ -1,0 +1,32 @@
+dimension: 2
+lambda1: 0.6
+
+f1:
+  type: huber
+  delta: 1.0
+  weight: 1.0
+
+f2:
+  type: hinge-loss
+  samples:
+    - [1.0, 0.0]
+    - [0.0, 1.0]
+  labels: [1.0, -1.0]
+  weight: 1.0
+
+kernel:
+  type: bregman-quadratic
+  matrix:
+    - [1.5, 0.0]
+    - [0.0, 0.7]
+  center: [0.0, 0.0]
+
+solver:
+  method: subgradient
+  initial_step: 0.05
+  tolerance: 1.0e-6
+  min_step: 1.0e-10
+  max_iterations: 500
+
+points:
+  - [0.2, -0.1]

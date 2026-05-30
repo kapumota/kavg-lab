@@ -1,5 +1,22 @@
 # Registro de cambios
 
+## [0.6.0] - Fase 2: matematica convexa ampliada
+
+### Agregado
+
+- Nuevas funciones convexas: `indicator-box`, `indicator-simplex`, `elastic-net`, `huber`, `hinge-loss`, `logistic-loss` y `max-affine`.
+- Nuevos kernels: `weighted-squared-norm`, `mahalanobis`, `huber`, `entropy-kl` y `bregman-quadratic`.
+- Soporte OSQP ampliado para elastic-net, restricciones de caja, restricciones de simplex y kernels cuadráticos generales.
+- Conjugado de L1 como indicador de la bola infinito para verificaciones de Fenchel compatibles.
+- Ejemplos YAML de Fase 2 en `examples/`.
+- Documento `docs/fase-2-matematica-convexa.md`.
+
+### Mantenido
+
+- El proyecto sigue siendo un CLI puro en Rust.
+- No se agregan dashboard, interfaz gráfica ni servidor web.
+
+
 Todos los cambios notables de este proyecto se documentarán en este archivo.
 
 El formato sigue una convención simple inspirada en Keep a Changelog y versionado semántico.

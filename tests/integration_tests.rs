@@ -3,7 +3,7 @@ use kavg_lab::config::{
     AgentSweepConfig, AttentionConfig, ExperimentConfig, MultiHeadAttentionConfig,
 };
 use kavg_lab::fenchel::{verify_fenchel_identity, FenchelIdentityInput};
-use kavg_lab::functions::{build_conjugate_function, build_function};
+use kavg_lab::functions::{build_conjugate_function, build_function, ConvexFunction};
 use kavg_lab::kernels::build_kernel;
 use kavg_lab::optimization::averages::AverageKind;
 use kavg_lab::optimization::kernel_average::{solve_kernel_average, KernelAverageInput};
@@ -276,4 +276,99 @@ fn compute_results_can_be_exported_as_json_and_manifest() {
 
     let _ = fs::remove_file(json_path);
     let _ = fs::remove_file(manifest_path);
+}
+
+
+#[test]
+fn phase2_convex_functions_and_kernels_parse_and_run() {
+    let experiment = ExperimentConfig::from_yaml_file(&example("fase2_elastic_box_mahalanobis.yaml"))
+        .expect("fase2_elastic_box_mahalanobis.yaml debe parsear");
+    let f1 = build_function(&experiment.f1).expect("f1 elastic-net debe construirse");
+    let f2 = build_function(&experiment.f2).expect("f2 indicator-box debe construirse");
+    let kernel = build_kernel(&experiment.kernel).expect("kernel mahalanobis debe construirse");
+
+    assert_eq!(f1.name(), "elastic-net");
+    assert_eq!(f2.name(), "indicator-box");
+    assert_eq!(kernel.name(), "mahalanobis");
+
+    for point in &experiment.points {
+        let result = solve_kernel_average(KernelAverageInput {
+            f1: f1.as_ref(),
+            f2: f2.as_ref(),
+            kernel: kernel.as_ref(),
+            lambda1: experiment.lambda1,
+            x: point,
+            solver: &experiment.solver,
+            average_kind: AverageKind::Kernel,
+        })
+        .expect("el caso Fase 2 con OSQP debe resolver cada punto");
+
+        assert!(result.value.is_finite());
+        assert_eq!(result.y1.len(), experiment.dimension);
+        assert_eq!(result.y2.len(), experiment.dimension);
+        assert!(result.y2.iter().all(|v| *v >= -1.0 - 1.0e-6 && *v <= 1.0 + 1.0e-6));
+    }
+}
+
+#[test]
+fn phase2_supports_extra_convex_configs_without_osqp() {
+    let text = r#"
+dimension: 2
+lambda1: 0.4
+f1:
+  type: logistic-loss
+  samples:
+    - [1.0, 0.0]
+    - [0.0, 1.0]
+  labels: [1.0, -1.0]
+  l2_alpha: 0.01
+f2:
+  type: max-affine
+  pieces:
+    - slope: [1.0, 0.0]
+      intercept: 0.0
+    - slope: [0.0, -1.0]
+      intercept: 0.2
+kernel:
+  type: huber
+  delta: 1.0
+solver:
+  method: subgradient
+  initial_step: 0.05
+  tolerance: 1.0e-6
+  min_step: 1.0e-10
+  max_iterations: 200
+points:
+  - [0.1, -0.2]
+"#;
+    let path = temporary_yaml_path("phase2_extra");
+    fs::write(&path, text).expect("no se pudo escribir YAML temporal Fase 2");
+    let experiment = ExperimentConfig::from_yaml_file(&path)
+        .expect("config Fase 2 con logistic, max-affine y huber debe parsear");
+    let f1 = build_function(&experiment.f1).expect("logistic-loss debe construirse");
+    let f2 = build_function(&experiment.f2).expect("max-affine debe construirse");
+    let kernel = build_kernel(&experiment.kernel).expect("huber kernel debe construirse");
+
+    let result = solve_kernel_average(KernelAverageInput {
+        f1: f1.as_ref(),
+        f2: f2.as_ref(),
+        kernel: kernel.as_ref(),
+        lambda1: experiment.lambda1,
+        x: &experiment.points[0],
+        solver: &experiment.solver,
+        average_kind: AverageKind::Kernel,
+    })
+    .expect("subgradient debe resolver el caso Fase 2 no cuadrático");
+
+    assert!(result.value.is_finite());
+    assert_eq!(result.y1.len(), experiment.dimension);
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn l1_conjugate_is_linf_ball_indicator() {
+    let function = kavg_lab::functions::L1ConjugateFunction::new(0.5)
+        .expect("conjugado L1 debe construirse");
+    assert_eq!(function.value(&[0.2, -0.5]), 0.0);
+    assert!(function.value(&[0.2, -0.7]).is_infinite());
 }

@@ -17,13 +17,12 @@ pub struct OsqpAverageSolution {
 ///
 /// Variables:
 /// z = [y1, y2, t1?, t2?]
-/// donde t1/t2 aparecen solo si f1/f2 son L1.
+/// donde t1/t2 aparecen si f1/f2 incluyen términos L1.
 ///
 /// Restricción central:
 /// lambda1 y1 + lambda2 y2 = x.
 ///
-/// Para L1 se agregan desigualdades lineales:
-/// y_i - t_i <= 0, -y_i - t_i <= 0.
+/// En Fase 2 se agregan restricciones de caja, simplex y kernels cuadráticos generales.
 pub fn solve_with_osqp(
     input: KernelAverageInput<'_>,
     lambda1: f64,
@@ -34,6 +33,10 @@ pub fn solve_with_osqp(
         .context("OSQP no soporta f1 en esta configuración.")?;
     let f2_kind = SupportedFunction::from_function(input.f2, n)
         .context("OSQP no soporta f2 en esta configuración.")?;
+    let kernel_form = input
+        .kernel
+        .quadratic_form(n)
+        .with_context(|| format!("OSQP requiere un kernel cuadrático; kernel actual: {}", input.kernel.name()))?;
 
     let t1_offset = if f1_kind.l1_alpha.is_some() {
         Some(2 * n)
@@ -67,19 +70,24 @@ pub fn solve_with_osqp(
         }
     }
 
-    // Antes el kernel OSQP soportado es squared-norm.
-    // Como g(y)=1/2||y||², el término weighted es:
-    // penalty_factor * lambda1 * lambda2 * 1/2 ||y1-y2||².
-    // En forma QP, eso agrega Hessiana c [I -I; -I I].
+    // Kernel cuadrático general:
+    // g(d)=1/2 dᵀHd + qkᵀd + c, d=y1-y2.
+    // El factor cte no afecta la solución y se recalcula fuera de OSQP.
     let penalty_factor = input.average_kind.penalty_factor();
     let c = penalty_factor * lambda1 * lambda2;
     if c != 0.0 {
         for i in 0..n {
-            p_dense[i][i] += c;
-            p_dense[n + i][n + i] += c;
-            p_dense[i][n + i] -= c;
-            p_dense[n + i][i] -= c;
+            q[i] += c * kernel_form.linear[i];
+            q[n + i] -= c * kernel_form.linear[i];
+            for j in 0..n {
+                let h = c * kernel_form.hessian[i][j];
+                p_dense[i][j] += h;
+                p_dense[n + i][n + j] += h;
+                p_dense[i][n + j] -= h;
+                p_dense[n + i][j] -= h;
+            }
         }
+        let _ = kernel_form.constant;
     }
 
     let mut a_rows: Vec<Vec<f64>> = Vec::new();
@@ -102,6 +110,9 @@ pub fn solve_with_osqp(
     if let Some(offset) = t2_offset {
         add_l1_constraints(&mut a_rows, &mut lower, &mut upper, var_count, n, offset, n);
     }
+
+    add_function_constraints(&mut a_rows, &mut lower, &mut upper, var_count, 0, n, &f1_kind);
+    add_function_constraints(&mut a_rows, &mut lower, &mut upper, var_count, n, n, &f2_kind);
 
     let p_iter = p_dense.iter().flat_map(|row| row.iter().copied());
     let a_iter = a_rows.iter().flat_map(|row| row.iter().copied());
@@ -133,19 +144,25 @@ pub fn solve_with_osqp(
 struct SupportedFunction {
     quadratic: Option<QuadraticForm>,
     l1_alpha: Option<f64>,
+    box_bounds: Option<(Vec<f64>, Vec<f64>)>,
+    simplex: bool,
 }
 
 impl SupportedFunction {
     fn from_function(function: &dyn ConvexFunction, dimension: usize) -> Result<Self> {
         let quadratic = function.quadratic_form(dimension);
         let l1_alpha = function.l1_alpha();
+        let box_bounds = function.box_bounds(dimension);
+        let simplex = function.simplex_constraint();
         anyhow::ensure!(
-            quadratic.is_some() || l1_alpha.is_some(),
-            "OSQP soporta quadratic, l2, conjugados cuadráticos/l2 y l1."
+            quadratic.is_some() || l1_alpha.is_some() || box_bounds.is_some() || simplex,
+            "OSQP soporta quadratic, l2, l1, elastic-net, indicator-box, indicator-simplex y conjugados compatibles."
         );
         Ok(Self {
             quadratic,
             l1_alpha,
+            box_bounds,
+            simplex,
         })
     }
 }
@@ -195,5 +212,43 @@ fn add_l1_constraints(
         a_rows.push(row);
         lower.push(-INF);
         upper.push(0.0);
+    }
+}
+
+fn add_function_constraints(
+    a_rows: &mut Vec<Vec<f64>>,
+    lower: &mut Vec<f64>,
+    upper: &mut Vec<f64>,
+    var_count: usize,
+    y_offset: usize,
+    dimension: usize,
+    function: &SupportedFunction,
+) {
+    if let Some((lo, hi)) = &function.box_bounds {
+        for i in 0..dimension {
+            let mut row = vec![0.0; var_count];
+            row[y_offset + i] = 1.0;
+            a_rows.push(row);
+            lower.push(lo[i]);
+            upper.push(hi[i]);
+        }
+    }
+
+    if function.simplex {
+        for i in 0..dimension {
+            let mut row = vec![0.0; var_count];
+            row[y_offset + i] = 1.0;
+            a_rows.push(row);
+            lower.push(0.0);
+            upper.push(INF);
+        }
+
+        let mut row = vec![0.0; var_count];
+        for i in 0..dimension {
+            row[y_offset + i] = 1.0;
+        }
+        a_rows.push(row);
+        lower.push(1.0);
+        upper.push(1.0);
     }
 }

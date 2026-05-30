@@ -1,0 +1,36 @@
+dimension: 2
+lambda1: 0.4
+
+f1:
+  type: logistic-loss
+  samples:
+    - [1.0, 0.0]
+    - [0.0, 1.0]
+    - [1.0, 1.0]
+  labels: [1.0, -1.0, 1.0]
+  l2_alpha: 0.01
+  weight: 1.0
+
+f2:
+  type: max-affine
+  pieces:
+    - slope: [1.0, 0.0]
+      intercept: 0.0
+    - slope: [0.0, -1.0]
+      intercept: 0.2
+
+kernel:
+  type: huber
+  delta: 1.0
+  weight: 0.5
+
+solver:
+  method: subgradient
+  initial_step: 0.05
+  tolerance: 1.0e-6
+  min_step: 1.0e-10
+  max_iterations: 500
+
+points:
+  - [0.1, -0.2]
+  - [0.3, 0.4]

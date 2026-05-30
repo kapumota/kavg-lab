@@ -136,6 +136,44 @@ impl ConvexFunction for L2ConjugateFunction {
     }
 }
 
+
+/// Conjugado de f(x)=alpha||x||₁.
+/// Es el indicador de la bola infinito: f*(s)=0 si ||s||∞ <= alpha, +∞ en otro caso.
+pub struct L1ConjugateFunction {
+    alpha: f64,
+}
+
+impl L1ConjugateFunction {
+    pub fn new(alpha: f64) -> Result<Self> {
+        anyhow::ensure!(alpha >= 0.0, "alpha debe ser no negativo.");
+        Ok(Self { alpha })
+    }
+}
+
+impl ConvexFunction for L1ConjugateFunction {
+    fn name(&self) -> &'static str {
+        "l1-conjugate-indicator-linf-ball"
+    }
+
+    fn value(&self, s: &[f64]) -> f64 {
+        if s.iter().all(|value| value.abs() <= self.alpha + 1.0e-12) {
+            0.0
+        } else {
+            f64::INFINITY
+        }
+    }
+
+    fn subgradient(&self, _s: &[f64]) -> Vec<f64> {
+        // En el interior de la bola infinito elegimos el subgradiente cero.
+        // En la frontera, el normal completo es multivaluado; para el solver QP usamos las cotas.
+        vec![0.0; _s.len()]
+    }
+
+    fn box_bounds(&self, dimension: usize) -> Option<(Vec<f64>, Vec<f64>)> {
+        Some((vec![-self.alpha; dimension], vec![self.alpha; dimension]))
+    }
+}
+
 /// Construye el conjugado analítico de una función soportada a partir de su configuración.
 pub fn build_conjugate_function(config: &FunctionConfig) -> Result<Box<dyn ConvexFunction>> {
     match config {
@@ -143,8 +181,15 @@ pub fn build_conjugate_function(config: &FunctionConfig) -> Result<Box<dyn Conve
             QuadraticConjugateFunction::new(matrix.clone(), vector.clone())?,
         )),
         FunctionConfig::L2 { alpha } => Ok(Box::new(L2ConjugateFunction::new(*alpha)?)),
-        FunctionConfig::L1 { .. } => anyhow::bail!(
-            "El MVP 3 no implementa todavía el conjugado analítico de L1 como función indicador. Use l2 para verify-fenchel."
+        FunctionConfig::L1 { alpha } => Ok(Box::new(L1ConjugateFunction::new(*alpha)?)),
+        FunctionConfig::ElasticNet { .. }
+        | FunctionConfig::IndicatorBox { .. }
+        | FunctionConfig::IndicatorSimplex { .. }
+        | FunctionConfig::Huber { .. }
+        | FunctionConfig::HingeLoss { .. }
+        | FunctionConfig::LogisticLoss { .. }
+        | FunctionConfig::MaxAffine { .. } => anyhow::bail!(
+            "El conjugado analítico todavía no está implementado para esta función de Fase 2. Use quadratic, l2 o l1 para verify-fenchel."
         ),
     }
 }
