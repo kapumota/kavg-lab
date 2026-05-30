@@ -25,6 +25,35 @@ pub enum FunctionConfig {
     L1 { alpha: f64 },
     #[serde(rename = "l2")]
     L2 { alpha: f64 },
+    #[serde(rename = "indicator-box")]
+    IndicatorBox { lower: Vec<f64>, upper: Vec<f64> },
+    #[serde(rename = "indicator-simplex")]
+    IndicatorSimplex { tolerance: Option<f64> },
+    #[serde(rename = "elastic-net")]
+    ElasticNet { l1_alpha: f64, l2_alpha: f64 },
+    #[serde(rename = "huber")]
+    Huber { delta: f64, weight: Option<f64> },
+    #[serde(rename = "hinge-loss")]
+    HingeLoss {
+        samples: Vec<Vec<f64>>,
+        labels: Vec<f64>,
+        weight: Option<f64>,
+    },
+    #[serde(rename = "logistic-loss")]
+    LogisticLoss {
+        samples: Vec<Vec<f64>>,
+        labels: Vec<f64>,
+        l2_alpha: Option<f64>,
+        weight: Option<f64>,
+    },
+    #[serde(rename = "max-affine")]
+    MaxAffine { pieces: Vec<AffinePieceConfig> },
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AffinePieceConfig {
+    pub slope: Vec<f64>,
+    pub intercept: f64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -32,6 +61,22 @@ pub enum FunctionConfig {
 pub enum KernelConfig {
     #[serde(rename = "squared-norm")]
     SquaredNorm,
+    #[serde(rename = "weighted-squared-norm")]
+    WeightedSquaredNorm { weights: Vec<f64> },
+    #[serde(rename = "mahalanobis")]
+    Mahalanobis { matrix: Vec<Vec<f64>> },
+    #[serde(rename = "huber")]
+    Huber { delta: f64, weight: Option<f64> },
+    #[serde(rename = "entropy-kl")]
+    EntropyKl {
+        reference: Option<Vec<f64>>,
+        epsilon: Option<f64>,
+    },
+    #[serde(rename = "bregman-quadratic")]
+    BregmanQuadratic {
+        matrix: Vec<Vec<f64>>,
+        center: Option<Vec<f64>>,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -114,6 +159,7 @@ impl ExperimentConfig {
 
         self.validate_function(&self.f1, "f1")?;
         self.validate_function(&self.f2, "f2")?;
+        self.validate_kernel(&self.kernel)?;
 
         for point in &self.points {
             anyhow::ensure!(
@@ -151,9 +197,194 @@ impl ExperimentConfig {
             FunctionConfig::L2 { alpha } => {
                 anyhow::ensure!(*alpha >= 0.0, "{}: alpha debe ser no negativo.", label);
             }
+            FunctionConfig::IndicatorBox { lower, upper } => {
+                anyhow::ensure!(
+                    lower.len() == self.dimension && upper.len() == self.dimension,
+                    "{}: lower y upper deben tener dimensión {}.",
+                    label,
+                    self.dimension
+                );
+                anyhow::ensure!(
+                    lower.iter().zip(upper).all(|(lo, hi)| lo <= hi),
+                    "{}: cada lower[i] debe ser menor o igual que upper[i].",
+                    label
+                );
+            }
+            FunctionConfig::IndicatorSimplex { tolerance } => {
+                if let Some(tol) = tolerance {
+                    anyhow::ensure!(*tol > 0.0, "{}: tolerance debe ser positiva.", label);
+                }
+            }
+            FunctionConfig::ElasticNet { l1_alpha, l2_alpha } => {
+                anyhow::ensure!(
+                    *l1_alpha >= 0.0,
+                    "{}: l1_alpha debe ser no negativo.",
+                    label
+                );
+                anyhow::ensure!(
+                    *l2_alpha >= 0.0,
+                    "{}: l2_alpha debe ser no negativo.",
+                    label
+                );
+            }
+            FunctionConfig::Huber { delta, weight } => {
+                anyhow::ensure!(*delta > 0.0, "{}: delta debe ser positivo.", label);
+                if let Some(weight) = weight {
+                    anyhow::ensure!(*weight >= 0.0, "{}: weight debe ser no negativo.", label);
+                }
+            }
+            FunctionConfig::HingeLoss {
+                samples,
+                labels,
+                weight,
+            } => {
+                self.validate_supervised_loss(label, samples, labels)?;
+                if let Some(weight) = weight {
+                    anyhow::ensure!(*weight >= 0.0, "{}: weight debe ser no negativo.", label);
+                }
+            }
+            FunctionConfig::LogisticLoss {
+                samples,
+                labels,
+                l2_alpha,
+                weight,
+            } => {
+                self.validate_supervised_loss(label, samples, labels)?;
+                if let Some(alpha) = l2_alpha {
+                    anyhow::ensure!(*alpha >= 0.0, "{}: l2_alpha debe ser no negativo.", label);
+                }
+                if let Some(weight) = weight {
+                    anyhow::ensure!(*weight >= 0.0, "{}: weight debe ser no negativo.", label);
+                }
+            }
+            FunctionConfig::MaxAffine { pieces } => {
+                anyhow::ensure!(
+                    !pieces.is_empty(),
+                    "{}: pieces no puede estar vacío.",
+                    label
+                );
+                anyhow::ensure!(
+                    pieces
+                        .iter()
+                        .all(|piece| piece.slope.len() == self.dimension),
+                    "{}: cada slope debe tener dimensión {}.",
+                    label,
+                    self.dimension
+                );
+            }
         }
         Ok(())
     }
+
+    fn validate_supervised_loss(
+        &self,
+        label: &str,
+        samples: &[Vec<f64>],
+        labels: &[f64],
+    ) -> Result<()> {
+        anyhow::ensure!(
+            !samples.is_empty(),
+            "{}: samples no puede estar vacío.",
+            label
+        );
+        anyhow::ensure!(
+            samples.len() == labels.len(),
+            "{}: samples y labels deben tener la misma longitud.",
+            label
+        );
+        anyhow::ensure!(
+            samples.iter().all(|sample| sample.len() == self.dimension),
+            "{}: cada sample debe tener dimensión {}.",
+            label,
+            self.dimension
+        );
+        anyhow::ensure!(
+            labels
+                .iter()
+                .all(|value| (*value - 1.0).abs() <= 1.0e-12 || (*value + 1.0).abs() <= 1.0e-12),
+            "{}: labels debe contener solo valores -1 o 1.",
+            label
+        );
+        Ok(())
+    }
+
+    fn validate_kernel(&self, kernel: &KernelConfig) -> Result<()> {
+        match kernel {
+            KernelConfig::SquaredNorm => {}
+            KernelConfig::WeightedSquaredNorm { weights } => {
+                anyhow::ensure!(
+                    weights.len() == self.dimension,
+                    "kernel.weighted-squared-norm: weights debe tener dimensión {}.",
+                    self.dimension
+                );
+                anyhow::ensure!(
+                    weights.iter().all(|w| *w >= 0.0),
+                    "kernel.weighted-squared-norm: todos los pesos deben ser no negativos."
+                );
+            }
+            KernelConfig::Mahalanobis { matrix } => {
+                validate_square_matrix(matrix, self.dimension, "kernel.mahalanobis.matrix")?;
+            }
+            KernelConfig::Huber { delta, weight } => {
+                anyhow::ensure!(*delta > 0.0, "kernel.huber.delta debe ser positivo.");
+                if let Some(weight) = weight {
+                    anyhow::ensure!(*weight >= 0.0, "kernel.huber.weight debe ser no negativo.");
+                }
+            }
+            KernelConfig::EntropyKl { reference, epsilon } => {
+                if let Some(reference) = reference {
+                    anyhow::ensure!(
+                        reference.len() == self.dimension,
+                        "kernel.entropy-kl.reference debe tener dimensión {}.",
+                        self.dimension
+                    );
+                    anyhow::ensure!(
+                        reference.iter().all(|v| *v > 0.0),
+                        "kernel.entropy-kl.reference debe contener valores positivos."
+                    );
+                }
+                if let Some(epsilon) = epsilon {
+                    anyhow::ensure!(
+                        *epsilon > 0.0,
+                        "kernel.entropy-kl.epsilon debe ser positivo."
+                    );
+                }
+            }
+            KernelConfig::BregmanQuadratic { matrix, center } => {
+                validate_square_matrix(matrix, self.dimension, "kernel.bregman-quadratic.matrix")?;
+                if let Some(center) = center {
+                    anyhow::ensure!(
+                        center.len() == self.dimension,
+                        "kernel.bregman-quadratic.center debe tener dimensión {}.",
+                        self.dimension
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn validate_square_matrix(matrix: &[Vec<f64>], dimension: usize, label: &str) -> Result<()> {
+    anyhow::ensure!(!matrix.is_empty(), "{} no puede estar vacía.", label);
+    anyhow::ensure!(
+        matrix.len() == dimension,
+        "{} debe tener {} filas.",
+        label,
+        dimension
+    );
+    anyhow::ensure!(
+        matrix.iter().all(|row| row.len() == dimension),
+        "{} debe ser cuadrada de dimensión {}.",
+        label,
+        dimension
+    );
+    anyhow::ensure!(
+        matrix.iter().enumerate().all(|(i, row)| row[i] >= 0.0),
+        "{} debe tener diagonal no negativa.",
+        label
+    );
+    Ok(())
 }
 
 /// Método de solución específico para atención.

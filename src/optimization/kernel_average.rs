@@ -79,13 +79,22 @@ pub fn solve_kernel_average(input: KernelAverageInput<'_>) -> Result<KernelAvera
         "max_iterations debe ser mayor que cero."
     );
 
-    let (best_y1, iterations, solver_metric, method_name) = match input.solver.method() {
-        SolverMethod::Subgradient => solve_with_subgradient(input, lambda1, lambda2),
-        SolverMethod::CoordinateDescent => solve_with_coordinate_descent(input, lambda1, lambda2),
+    let (best_y1, best_y2, iterations, solver_metric, method_name) = match input.solver.method() {
+        SolverMethod::Subgradient => {
+            let (y1, iterations, metric, method_name) =
+                solve_with_subgradient(input, lambda1, lambda2);
+            (y1, None, iterations, metric, method_name)
+        }
+        SolverMethod::CoordinateDescent => {
+            let (y1, iterations, metric, method_name) =
+                solve_with_coordinate_descent(input, lambda1, lambda2);
+            (y1, None, iterations, metric, method_name)
+        }
         SolverMethod::Osqp => {
             let solution = solve_with_osqp(input, lambda1, lambda2)?;
             (
                 solution.y1,
+                Some(solution.y2),
                 solution.iterations,
                 solution.metric,
                 "osqp".to_string(),
@@ -93,11 +102,11 @@ pub fn solve_kernel_average(input: KernelAverageInput<'_>) -> Result<KernelAvera
         }
     };
 
-    let y2 = compute_y2(input.x, &best_y1, lambda1, lambda2);
+    let y2 = best_y2.unwrap_or_else(|| compute_y2(input.x, &best_y1, lambda1, lambda2));
     let diff = sub(&best_y1, &y2);
     let raw_penalty = input.kernel.value(&diff);
     let weighted_penalty = input.average_kind.penalty_factor() * lambda1 * lambda2 * raw_penalty;
-    let value = reduced_objective(input, &best_y1, lambda1, lambda2);
+    let value = full_objective(input, &best_y1, &y2, lambda1, lambda2);
 
     Ok(KernelAverageResult {
         index: None,
@@ -216,13 +225,23 @@ fn solve_with_coordinate_descent(
     )
 }
 
-fn reduced_objective(input: KernelAverageInput<'_>, y1: &[f64], lambda1: f64, lambda2: f64) -> f64 {
-    let y2 = compute_y2(input.x, y1, lambda1, lambda2);
-    let diff = sub(y1, &y2);
+fn full_objective(
+    input: KernelAverageInput<'_>,
+    y1: &[f64],
+    y2: &[f64],
+    lambda1: f64,
+    lambda2: f64,
+) -> f64 {
+    let diff = sub(y1, y2);
 
     lambda1 * input.f1.value(y1)
-        + lambda2 * input.f2.value(&y2)
+        + lambda2 * input.f2.value(y2)
         + input.average_kind.penalty_factor() * lambda1 * lambda2 * input.kernel.value(&diff)
+}
+
+fn reduced_objective(input: KernelAverageInput<'_>, y1: &[f64], lambda1: f64, lambda2: f64) -> f64 {
+    let y2 = compute_y2(input.x, y1, lambda1, lambda2);
+    full_objective(input, y1, &y2, lambda1, lambda2)
 }
 
 fn reduced_subgradient(

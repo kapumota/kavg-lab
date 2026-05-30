@@ -946,3 +946,47 @@ cargo build --release
 ```
 
 Esto permite que cada `push` a `main` y cada Pull Request validen que el CLI compila, mantiene formato, pasa pruebas y genera un binario release.
+
+#### Fase 2: matemática convexa ampliada
+
+La Fase 2 mantiene el proyecto como CLI, pero amplía el núcleo matemático. Además de `quadratic`, `l1`, `l2` y `squared-norm`, se agregan funciones convexas y kernels para experimentar con restricciones, regularización, pérdidas de aprendizaje automático y geometrías no euclidianas.
+
+Funciones convexas adicionales:
+
+```text
+indicator-box
+indicator-simplex
+elastic-net
+huber
+hinge-loss
+logistic-loss
+max-affine
+```
+
+Kernels adicionales:
+
+```text
+weighted-squared-norm
+mahalanobis
+huber
+entropy-kl
+bregman-quadratic
+```
+
+Ejemplo con elastic net, caja y Mahalanobis:
+
+```bash
+cargo run -- compute \
+  --config examples/fase2_elastic_box_mahalanobis.yaml \
+  --output sample_outputs/fase2_results.csv \
+  --json sample_outputs/fase2_results.json \
+  --manifest sample_outputs/fase2_manifest.json
+```
+
+El kernel de Mahalanobis usa la forma:
+
+```text
+g(z) = 1/2 z^T M z
+```
+
+Esto permite estudiar geometrías distintas a la euclidiana, útiles para embeddings, métricas aprendidas, atención regularizada y optimización convexa.

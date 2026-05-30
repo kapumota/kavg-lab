@@ -1,4 +1,4 @@
-use crate::kernels::KernelFunction;
+use crate::kernels::{KernelFunction, KernelQuadraticForm};
 use crate::math::norm2_squared;
 
 /// Kernel cuadrático: g(x) = 1/2 ||x||².
@@ -16,5 +16,17 @@ impl KernelFunction for SquaredNormKernel {
     fn gradient(&self, x: &[f64]) -> Vec<f64> {
         // El gradiente de 1/2 ||x||² es x.
         x.to_vec()
+    }
+
+    fn quadratic_form(&self, dimension: usize) -> Option<KernelQuadraticForm> {
+        let mut hessian = vec![vec![0.0; dimension]; dimension];
+        for (i, row) in hessian.iter_mut().enumerate().take(dimension) {
+            row[i] = 1.0;
+        }
+        Some(KernelQuadraticForm {
+            hessian,
+            linear: vec![0.0; dimension],
+            constant: 0.0,
+        })
     }
 }
