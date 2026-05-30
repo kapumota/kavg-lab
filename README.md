@@ -990,3 +990,52 @@ g(z) = 1/2 z^T M z
 ```
 
 Esto permite estudiar geometrías distintas a la euclidiana, útiles para embeddings, métricas aprendidas, atención regularizada y optimización convexa.
+
+#### Fase 3: solvers más fuertes y comparación algorítmica
+
+La Fase 3 mantiene el proyecto como CLI puro y agrega métodos de optimización adicionales para estudiar el comportamiento algorítmico de los promedios kernel y la atención regularizada.
+
+Solvers convexos nuevos:
+
+```text
+proximal-gradient
+fista
+admm
+```
+
+Solvers de atención sobre simplex:
+
+```text
+projected-gradient
+mirror-descent
+frank-wolfe
+```
+
+La atención regularizada trabaja sobre distribuciones de probabilidad, por lo que los pesos deben cumplir:
+
+```text
+p_i >= 0
+sum_i p_i = 1
+```
+
+Por ello, `mirror-descent` y `frank-wolfe` son especialmente útiles para estudiar geometría del simplex, dispersión de pesos y estabilidad frente al prior.
+
+Ejemplo de atención con mirror descent:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/attention_demo.yaml \
+  --solver mirror-descent \
+  --output sample_outputs/attention_mirror.csv
+```
+
+Ejemplo de comparación de solvers:
+
+```bash
+cargo run -- compare-solvers \
+  --config examples/fase3_compare_solvers.yaml \
+  --solvers coordinate-descent,subgradient,osqp,proximal-gradient,fista \
+  --output sample_outputs/solver_comparison.csv
+```
+
+El comando `compare-solvers` convierte el proyecto en un laboratorio CLI para comparar valor objetivo, iteraciones, métrica del solver y estado de cada método sobre los mismos puntos de entrada.

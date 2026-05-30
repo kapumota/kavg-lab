@@ -1,6 +1,6 @@
 use crate::config::{
     AgentObjective, AgentSweepConfig, AttentionConfig, AttentionMaskConfig, AttentionSolverConfig,
-    MaskEntry, MultiHeadAttentionConfig,
+    AttentionSolverMethod, MaskEntry, MultiHeadAttentionConfig,
 };
 use crate::math::{dot, format_vector, norm2, sub};
 use anyhow::{bail, Result};
@@ -9,6 +9,7 @@ use anyhow::{bail, Result};
 #[derive(Debug, Clone)]
 pub struct AttentionResult {
     pub index: usize,
+    pub solver_method: String,
     pub query: Vec<f64>,
     pub scores: Vec<f64>,
     pub masked_scores: Vec<f64>,
@@ -401,6 +402,7 @@ fn run_single_attention(
 
     Ok(AttentionResult {
         index,
+        solver_method: params.solver.method().as_str().to_string(),
         query: query.to_vec(),
         scores,
         masked_scores,
@@ -560,7 +562,20 @@ fn solve_kernel_regularized_attention(
     solver: &AttentionSolverConfig,
     allowed: &[bool],
 ) -> RegularizedAttentionSolution {
-    // Corrección importante: la inicialización respeta la temperatura usada por softmax.
+    match solver.method() {
+        AttentionSolverMethod::ProjectedGradient => {
+            solve_attention_projected_gradient(scores, prior, temperature, gamma, solver, allowed)
+        }
+        AttentionSolverMethod::MirrorDescent => {
+            solve_attention_mirror_descent(scores, prior, temperature, gamma, solver, allowed)
+        }
+        AttentionSolverMethod::FrankWolfe => {
+            solve_attention_frank_wolfe(scores, prior, temperature, gamma, solver, allowed)
+        }
+    }
+}
+
+fn initial_attention_weights(scores: &[f64], temperature: f64, allowed: &[bool]) -> Vec<f64> {
     let scaled_scores: Vec<f64> = scores
         .iter()
         .map(|s| {
@@ -571,36 +586,55 @@ fn solve_kernel_regularized_attention(
             }
         })
         .collect();
-    let mut weights = project_to_masked_simplex(&softmax(&scaled_scores), allowed);
+    project_to_masked_simplex(&softmax(&scaled_scores), allowed)
+}
+
+fn attention_gradient(
+    weights: &[f64],
+    scores: &[f64],
+    prior: &[f64],
+    temperature: f64,
+    gamma: f64,
+    allowed: &[bool],
+) -> Vec<f64> {
+    let eps = 1.0e-12;
+    weights
+        .iter()
+        .zip(scores)
+        .zip(prior)
+        .zip(allowed)
+        .map(|(((p, s), p0), is_allowed)| {
+            if *is_allowed {
+                -*s + temperature * ((*p).max(eps).ln() + 1.0) + gamma * (*p - *p0)
+            } else {
+                0.0
+            }
+        })
+        .collect()
+}
+
+fn solve_attention_projected_gradient(
+    scores: &[f64],
+    prior: &[f64],
+    temperature: f64,
+    gamma: f64,
+    solver: &AttentionSolverConfig,
+    allowed: &[bool],
+) -> RegularizedAttentionSolution {
+    let mut weights = initial_attention_weights(scores, temperature, allowed);
     let mut step = solver.initial_step;
     let min_step = solver.min_step();
-    let eps = 1.0e-12;
     let mut solver_metric = f64::INFINITY;
     let mut iterations = 0;
 
     for iter in 0..solver.max_iterations {
         iterations = iter + 1;
-
-        let gradient: Vec<f64> = weights
-            .iter()
-            .zip(scores)
-            .zip(prior)
-            .zip(allowed)
-            .map(|(((p, s), p0), is_allowed)| {
-                if *is_allowed {
-                    -*s + temperature * ((*p).max(eps).ln() + 1.0) + gamma * (*p - *p0)
-                } else {
-                    0.0
-                }
-            })
-            .collect();
-
+        let gradient = attention_gradient(&weights, scores, prior, temperature, gamma, allowed);
         let candidate: Vec<f64> = weights
             .iter()
             .zip(&gradient)
             .map(|(p, g)| p - step * g)
             .collect();
-
         let projected = project_to_masked_simplex(&candidate, allowed);
         let diff = sub(&projected, &weights);
         solver_metric = norm2(&diff);
@@ -609,9 +643,108 @@ fn solve_kernel_regularized_attention(
         if solver_metric <= solver.tolerance {
             break;
         }
-
-        // Reducción suave del paso para estabilizar la iteración en problemas pequeños.
         step = (step * 0.995).max(min_step);
+    }
+
+    RegularizedAttentionSolution {
+        entropy: entropy(&weights),
+        weights,
+        prior: prior.to_vec(),
+        iterations,
+        solver_metric,
+    }
+}
+
+fn solve_attention_mirror_descent(
+    scores: &[f64],
+    prior: &[f64],
+    temperature: f64,
+    gamma: f64,
+    solver: &AttentionSolverConfig,
+    allowed: &[bool],
+) -> RegularizedAttentionSolution {
+    let mut weights = initial_attention_weights(scores, temperature, allowed);
+    let mut step = solver.initial_step;
+    let min_step = solver.min_step();
+    let mut solver_metric = f64::INFINITY;
+    let mut iterations = 0;
+
+    for iter in 0..solver.max_iterations {
+        iterations = iter + 1;
+        let gradient = attention_gradient(&weights, scores, prior, temperature, gamma, allowed);
+        let candidate: Vec<f64> = weights
+            .iter()
+            .zip(&gradient)
+            .zip(allowed)
+            .map(|((p, g), is_allowed)| {
+                if *is_allowed {
+                    p.max(1.0e-15) * (-step * g).clamp(-60.0, 60.0).exp()
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        let projected = project_to_masked_simplex(&candidate, allowed);
+        let diff = sub(&projected, &weights);
+        solver_metric = norm2(&diff);
+        weights = projected;
+
+        if solver_metric <= solver.tolerance {
+            break;
+        }
+        step = (step * 0.995).max(min_step);
+    }
+
+    RegularizedAttentionSolution {
+        entropy: entropy(&weights),
+        weights,
+        prior: prior.to_vec(),
+        iterations,
+        solver_metric,
+    }
+}
+
+fn solve_attention_frank_wolfe(
+    scores: &[f64],
+    prior: &[f64],
+    temperature: f64,
+    gamma: f64,
+    solver: &AttentionSolverConfig,
+    allowed: &[bool],
+) -> RegularizedAttentionSolution {
+    let mut weights = initial_attention_weights(scores, temperature, allowed);
+    let mut solver_metric = f64::INFINITY;
+    let mut iterations = 0;
+
+    for iter in 0..solver.max_iterations {
+        iterations = iter + 1;
+        let gradient = attention_gradient(&weights, scores, prior, temperature, gamma, allowed);
+        let mut best_index = None;
+        let mut best_value = f64::INFINITY;
+        for (index, (value, is_allowed)) in gradient.iter().zip(allowed).enumerate() {
+            if *is_allowed && *value < best_value {
+                best_value = *value;
+                best_index = Some(index);
+            }
+        }
+
+        let Some(best_index) = best_index else { break };
+        let mut vertex = vec![0.0; weights.len()];
+        vertex[best_index] = 1.0;
+        let step = (2.0 / (iter as f64 + 2.0)).min(solver.initial_step.max(1.0e-12));
+        let next: Vec<f64> = weights
+            .iter()
+            .zip(&vertex)
+            .map(|(p, v)| (1.0 - step) * p + step * v)
+            .collect();
+        let projected = project_to_masked_simplex(&next, allowed);
+        let diff = sub(&projected, &weights);
+        solver_metric = norm2(&diff);
+        weights = projected;
+
+        if solver_metric <= solver.tolerance {
+            break;
+        }
     }
 
     RegularizedAttentionSolution {

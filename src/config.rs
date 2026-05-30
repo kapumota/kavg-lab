@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::{fs, path::Path};
+use std::{fs, path::Path, str::FromStr};
 
 #[derive(Debug, Deserialize)]
 pub struct ExperimentConfig {
@@ -85,6 +85,9 @@ pub enum SolverMethod {
     Subgradient,
     CoordinateDescent,
     Osqp,
+    ProximalGradient,
+    Fista,
+    Admm,
 }
 
 impl SolverMethod {
@@ -93,6 +96,25 @@ impl SolverMethod {
             SolverMethod::Subgradient => "subgradient",
             SolverMethod::CoordinateDescent => "coordinate-descent",
             SolverMethod::Osqp => "osqp",
+            SolverMethod::ProximalGradient => "proximal-gradient",
+            SolverMethod::Fista => "fista",
+            SolverMethod::Admm => "admm",
+        }
+    }
+}
+
+impl FromStr for SolverMethod {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "subgradient" => Ok(SolverMethod::Subgradient),
+            "coordinate-descent" | "coordinate_descent" => Ok(SolverMethod::CoordinateDescent),
+            "osqp" => Ok(SolverMethod::Osqp),
+            "proximal-gradient" | "proximal_gradient" => Ok(SolverMethod::ProximalGradient),
+            "fista" => Ok(SolverMethod::Fista),
+            "admm" => Ok(SolverMethod::Admm),
+            other => anyhow::bail!("solver no reconocido: {other}"),
         }
     }
 }
@@ -393,19 +415,38 @@ fn validate_square_matrix(matrix: &[Vec<f64>], dimension: usize, label: &str) ->
 #[serde(rename_all = "kebab-case")]
 pub enum AttentionSolverMethod {
     ProjectedGradient,
+    MirrorDescent,
+    FrankWolfe,
 }
 
 impl AttentionSolverMethod {
     pub fn as_str(&self) -> &'static str {
         match self {
             AttentionSolverMethod::ProjectedGradient => "projected-gradient",
+            AttentionSolverMethod::MirrorDescent => "mirror-descent",
+            AttentionSolverMethod::FrankWolfe => "frank-wolfe",
+        }
+    }
+}
+
+impl FromStr for AttentionSolverMethod {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "projected-gradient" | "projected_gradient" => {
+                Ok(AttentionSolverMethod::ProjectedGradient)
+            }
+            "mirror-descent" | "mirror_descent" => Ok(AttentionSolverMethod::MirrorDescent),
+            "frank-wolfe" | "frank_wolfe" => Ok(AttentionSolverMethod::FrankWolfe),
+            other => anyhow::bail!("solver de atención no reconocido: {other}"),
         }
     }
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AttentionSolverConfig {
-    /// Método numérico de atención. Actualmente solo se implementa projected-gradient.
+    /// Método numérico de atención. Implementa projected-gradient, mirror-descent y frank-wolfe.
     pub method: Option<AttentionSolverMethod>,
     /// Tamaño de paso inicial para gradiente proyectado.
     pub initial_step: f64,

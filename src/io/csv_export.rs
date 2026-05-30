@@ -136,6 +136,7 @@ pub fn export_attention_results(path: &Path, results: &[AttentionResult]) -> Res
 
     writer.write_record([
         "index",
+        "solver_method",
         "query",
         "scores",
         "masked_scores",
@@ -165,6 +166,7 @@ pub fn export_attention_results(path: &Path, results: &[AttentionResult]) -> Res
     for result in results {
         writer.write_record([
             result.index.to_string(),
+            result.solver_method.clone(),
             result.query_csv(),
             result.scores_csv(),
             result.masked_scores_csv(),
@@ -267,6 +269,60 @@ pub fn export_agent_sweep_results(path: &Path, results: &[AgentSweepResult]) -> 
             format!("{:.12}", result.mean_output_shift),
             format!("{:.12}", result.mean_js_softmax_regularized),
             format!("{:.12}", result.mean_effective_tokens),
+        ])?;
+    }
+
+    writer.flush()?;
+    Ok(())
+}
+
+use crate::optimization::solver_comparison::SolverComparisonRow;
+
+/// Exporta la comparación CLI entre varios solvers sobre los mismos puntos.
+pub fn export_solver_comparison(path: &Path, results: &[SolverComparisonRow]) -> Result<()> {
+    let mut writer = csv::Writer::from_path(path)?;
+
+    writer.write_record([
+        "solver_method",
+        "index",
+        "point",
+        "status",
+        "value",
+        "iterations",
+        "solver_metric",
+        "raw_penalty",
+        "weighted_penalty",
+        "y1",
+        "y2",
+        "error",
+    ])?;
+
+    for result in results {
+        writer.write_record([
+            result.solver_method.clone(),
+            result.index.to_string(),
+            result.point_csv(),
+            result.status.clone(),
+            result
+                .value
+                .map(|v| format!("{:.12}", v))
+                .unwrap_or_default(),
+            result.iterations.map(|v| v.to_string()).unwrap_or_default(),
+            result
+                .solver_metric
+                .map(|v| format!("{:.12e}", v))
+                .unwrap_or_default(),
+            result
+                .raw_penalty
+                .map(|v| format!("{:.12}", v))
+                .unwrap_or_default(),
+            result
+                .weighted_penalty
+                .map(|v| format!("{:.12}", v))
+                .unwrap_or_default(),
+            result.y1_csv(),
+            result.y2_csv(),
+            result.error.clone().unwrap_or_default(),
         ])?;
     }
 

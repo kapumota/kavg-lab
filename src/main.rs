@@ -5,13 +5,14 @@ use clap::Parser;
 use cli::{Cli, Commands};
 use kavg_lab::attention::{run_agent_sweep, run_attention_demo, run_multihead_attention_demo};
 use kavg_lab::config::{
-    AgentSweepConfig, AttentionConfig, ExperimentConfig, MultiHeadAttentionConfig,
+    AgentSweepConfig, AttentionConfig, AttentionSolverMethod, ExperimentConfig,
+    MultiHeadAttentionConfig, SolverMethod,
 };
 use kavg_lab::fenchel::{verify_fenchel_identity, FenchelIdentityInput};
 use kavg_lab::functions::{build_conjugate_function, build_function};
 use kavg_lab::io::csv_export::{
     export_agent_sweep_results, export_attention_results, export_comparison, export_fenchel_checks,
-    export_multihead_results, export_results,
+    export_multihead_results, export_results, export_solver_comparison,
 };
 use kavg_lab::io::json_export::{
     export_compute_results_json, export_execution_manifest, ExecutionManifest,
@@ -20,6 +21,7 @@ use kavg_lab::kernels::build_kernel;
 use kavg_lab::optimization::averages::AverageKind;
 use kavg_lab::optimization::comparison::compare_averages;
 use kavg_lab::optimization::kernel_average::{solve_kernel_average, KernelAverageInput};
+use kavg_lab::optimization::solver_comparison::compare_solvers_for_points;
 use std::time::SystemTime;
 
 fn main() -> Result<()> {
@@ -33,8 +35,17 @@ fn main() -> Result<()> {
             manifest,
         } => run_compute(&config, output, json_output, manifest)?,
         Commands::Compare { config, output } => run_compare(&config, output)?,
+        Commands::CompareSolvers {
+            config,
+            solvers,
+            output,
+        } => run_compare_solvers(&config, solvers, output)?,
         Commands::VerifyFenchel { config, output } => run_verify_fenchel(&config, output)?,
-        Commands::AttentionDemo { config, output } => run_attention_demo_command(&config, output)?,
+        Commands::AttentionDemo {
+            config,
+            solver,
+            output,
+        } => run_attention_demo_command(&config, solver, output)?,
         Commands::MultiheadAttentionDemo { config, output } => {
             run_multihead_attention_demo_command(&config, output)?
         }
@@ -192,6 +203,78 @@ fn run_compare(config: &std::path::Path, output: Option<std::path::PathBuf>) -> 
     Ok(())
 }
 
+fn run_compare_solvers(
+    config: &std::path::Path,
+    solvers: Vec<String>,
+    output: Option<std::path::PathBuf>,
+) -> Result<()> {
+    let experiment = ExperimentConfig::from_yaml_file(config)?;
+    let f1 = build_function(&experiment.f1)?;
+    let f2 = build_function(&experiment.f2)?;
+    let kernel = build_kernel(&experiment.kernel)?;
+    let methods = parse_solver_methods(&solvers)?;
+
+    println!("Experimento KAvgLab - Comparación de solvers");
+    println!("f1: {}", f1.name());
+    println!("f2: {}", f2.name());
+    println!("kernel: {}", kernel.name());
+    println!("puntos: {}", experiment.points.len());
+    println!(
+        "solvers: {}",
+        methods
+            .iter()
+            .map(|method| method.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    println!();
+
+    let results = compare_solvers_for_points(
+        &experiment.points,
+        f1.as_ref(),
+        f2.as_ref(),
+        kernel.as_ref(),
+        experiment.lambda1,
+        &experiment.solver,
+        &methods,
+    );
+
+    for result in &results {
+        if result.status == "ok" {
+            println!(
+                "solver={} punto={} valor={:.10} iteraciones={} métrica={:.6e}",
+                result.solver_method,
+                result.index,
+                result.value.unwrap_or_default(),
+                result.iterations.unwrap_or_default(),
+                result.solver_metric.unwrap_or_default()
+            );
+        } else {
+            println!(
+                "solver={} punto={} ERROR: {}",
+                result.solver_method,
+                result.index,
+                result.error.clone().unwrap_or_default()
+            );
+        }
+    }
+
+    if let Some(path) = output {
+        export_solver_comparison(&path, &results)?;
+        println!("Comparación de solvers exportada a: {}", path.display());
+    }
+
+    Ok(())
+}
+
+fn parse_solver_methods(values: &[String]) -> Result<Vec<SolverMethod>> {
+    anyhow::ensure!(
+        !values.is_empty(),
+        "Debe indicar al menos un solver con --solvers."
+    );
+    values.iter().map(|value| value.parse()).collect()
+}
+
 fn run_verify_fenchel(config: &std::path::Path, output: Option<std::path::PathBuf>) -> Result<()> {
     let experiment = ExperimentConfig::from_yaml_file(config)?;
     let f1 = build_function(&experiment.f1)?;
@@ -277,9 +360,13 @@ fn run_verify_fenchel(config: &std::path::Path, output: Option<std::path::PathBu
 
 fn run_attention_demo_command(
     config: &std::path::Path,
+    solver_override: Option<AttentionSolverMethod>,
     output: Option<std::path::PathBuf>,
 ) -> Result<()> {
-    let experiment = AttentionConfig::from_yaml_file(config)?;
+    let mut experiment = AttentionConfig::from_yaml_file(config)?;
+    if let Some(solver) = solver_override {
+        experiment.attention_solver.method = Some(solver);
+    }
     let results = run_attention_demo(&experiment)?;
 
     println!("Experimento KAvgLab - Demostracion de atencion");
