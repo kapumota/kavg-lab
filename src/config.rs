@@ -409,6 +409,42 @@ fn validate_square_matrix(matrix: &[Vec<f64>], dimension: usize, label: &str) ->
     Ok(())
 }
 
+/// Regla base de atención usada para convertir scores en pesos sobre el simplex.
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum AttentionRule {
+    Softmax,
+    Sparsemax,
+    #[serde(rename = "entmax15", alias = "entmax-1.5")]
+    Entmax15,
+    TopK,
+}
+
+impl AttentionRule {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AttentionRule::Softmax => "softmax",
+            AttentionRule::Sparsemax => "sparsemax",
+            AttentionRule::Entmax15 => "entmax-1.5",
+            AttentionRule::TopK => "top-k",
+        }
+    }
+}
+
+impl FromStr for AttentionRule {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "softmax" => Ok(AttentionRule::Softmax),
+            "sparsemax" => Ok(AttentionRule::Sparsemax),
+            "entmax-1.5" | "entmax15" | "entmax-15" => Ok(AttentionRule::Entmax15),
+            "top-k" | "top_k" | "topk" => Ok(AttentionRule::TopK),
+            other => anyhow::bail!("regla de atención no reconocida: {other}"),
+        }
+    }
+}
+
 /// Método de solución específico para atención.
 /// Se mantiene separado del solver convexo porque la demo usa gradiente proyectado.
 #[derive(Debug, Deserialize, Clone)]
@@ -525,6 +561,10 @@ pub enum AttentionMaskConfig {
     None,
     #[serde(rename = "causal")]
     Causal,
+    #[serde(rename = "sliding-window")]
+    SlidingWindow { window_size: usize },
+    #[serde(rename = "block-sparse")]
+    BlockSparse { block_size: usize },
     #[serde(rename = "custom")]
     Custom { matrix: Vec<Vec<MaskEntry>> },
 }
@@ -538,6 +578,17 @@ impl AttentionMaskConfig {
                     rows == cols,
                     "mask.type=causal requiere queries.len() == keys.len() para una demo autoregresiva tipo LLM."
                 );
+                Ok(())
+            }
+            AttentionMaskConfig::SlidingWindow { window_size } => {
+                anyhow::ensure!(
+                    *window_size > 0,
+                    "mask.window_size debe ser mayor que cero."
+                );
+                Ok(())
+            }
+            AttentionMaskConfig::BlockSparse { block_size } => {
+                anyhow::ensure!(*block_size > 0, "mask.block_size debe ser mayor que cero.");
                 Ok(())
             }
             AttentionMaskConfig::Custom { matrix } => {
@@ -570,6 +621,10 @@ pub struct AttentionConfig {
     pub temperature: f64,
     /// Peso del término kernel gamma/2 ||p - p0||².
     pub kernel_gamma: f64,
+    /// Regla base: softmax, sparsemax, entmax-1.5 o top-k. Si se omite, usa softmax.
+    pub attention_rule: Option<AttentionRule>,
+    /// K usado cuando attention_rule=top-k. Si se omite, se reutiliza top_k.
+    pub attention_top_k: Option<usize>,
     /// Solver usado por gradiente proyectado.
     pub attention_solver: AttentionSolverConfig,
     /// Máscara opcional: none, causal o custom.
@@ -614,6 +669,13 @@ impl AttentionConfig {
         if let Some(top_k) = self.top_k {
             anyhow::ensure!(top_k > 0, "top_k debe ser mayor que cero.");
         }
+        if let Some(top_k) = self.attention_top_k {
+            anyhow::ensure!(top_k > 0, "attention_top_k debe ser mayor que cero.");
+            anyhow::ensure!(
+                top_k <= self.keys.len(),
+                "attention_top_k no puede exceder la cantidad de keys."
+            );
+        }
         Ok(())
     }
 }
@@ -625,6 +687,8 @@ pub struct AttentionHeadConfig {
     pub temperature: f64,
     pub kernel_gamma: f64,
     pub prior: Option<Vec<f64>>,
+    pub attention_rule: Option<AttentionRule>,
+    pub attention_top_k: Option<usize>,
     pub attention_solver: Option<AttentionSolverConfig>,
     pub mask: Option<AttentionMaskConfig>,
 }
@@ -648,6 +712,16 @@ impl AttentionHeadConfig {
         if let Some(mask) = &self.mask {
             mask.validate(rows, cols)?;
         }
+        if let Some(top_k) = self.attention_top_k {
+            anyhow::ensure!(
+                top_k > 0,
+                "heads[{index}].attention_top_k debe ser mayor que cero."
+            );
+            anyhow::ensure!(
+                top_k <= cols,
+                "heads[{index}].attention_top_k no puede exceder la cantidad de keys."
+            );
+        }
         Ok(())
     }
 }
@@ -656,6 +730,8 @@ impl AttentionHeadConfig {
 pub struct MultiHeadAttentionConfig {
     pub dimension: usize,
     pub default_attention_solver: AttentionSolverConfig,
+    pub default_attention_rule: Option<AttentionRule>,
+    pub default_attention_top_k: Option<usize>,
     pub default_mask: Option<AttentionMaskConfig>,
     #[serde(alias = "text_queries")]
     pub queries: Vec<Vec<f64>>,
@@ -691,6 +767,16 @@ impl MultiHeadAttentionConfig {
             .validate("default_attention_solver")?;
         if let Some(mask) = &self.default_mask {
             mask.validate(self.queries.len(), self.keys.len())?;
+        }
+        if let Some(top_k) = self.default_attention_top_k {
+            anyhow::ensure!(
+                top_k > 0,
+                "default_attention_top_k debe ser mayor que cero."
+            );
+            anyhow::ensure!(
+                top_k <= self.keys.len(),
+                "default_attention_top_k no puede exceder la cantidad de keys."
+            );
         }
         for (index, head) in self.heads.iter().enumerate() {
             head.validate(index, self.queries.len(), self.keys.len())?;

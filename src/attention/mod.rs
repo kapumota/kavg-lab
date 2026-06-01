@@ -1,6 +1,6 @@
 use crate::config::{
-    AgentObjective, AgentSweepConfig, AttentionConfig, AttentionMaskConfig, AttentionSolverConfig,
-    AttentionSolverMethod, MaskEntry, MultiHeadAttentionConfig,
+    AgentObjective, AgentSweepConfig, AttentionConfig, AttentionMaskConfig, AttentionRule,
+    AttentionSolverConfig, AttentionSolverMethod, MaskEntry, MultiHeadAttentionConfig,
 };
 use crate::math::{dot, format_vector, norm2, sub};
 use crate::parallel::{self, ExecutionMode};
@@ -11,6 +11,7 @@ use anyhow::{bail, Result};
 pub struct AttentionResult {
     pub index: usize,
     pub solver_method: String,
+    pub attention_rule: String,
     pub query: Vec<f64>,
     pub scores: Vec<f64>,
     pub masked_scores: Vec<f64>,
@@ -170,6 +171,8 @@ struct AttentionParams<'a> {
     solver: &'a AttentionSolverConfig,
     prior: Option<&'a Vec<f64>>,
     mask: Option<&'a AttentionMaskConfig>,
+    attention_rule: AttentionRule,
+    attention_top_k: usize,
     top_k: usize,
 }
 
@@ -191,6 +194,12 @@ pub fn run_attention_demo_with_mode(
         solver: &config.attention_solver,
         prior: config.prior.as_ref(),
         mask: config.mask.as_ref(),
+        attention_rule: config.attention_rule.unwrap_or(AttentionRule::Softmax),
+        attention_top_k: effective_attention_top_k(
+            config.attention_top_k,
+            config.top_k,
+            config.keys.len(),
+        ),
         top_k,
     };
 
@@ -239,6 +248,15 @@ fn run_multihead_single_query(
             solver,
             prior: head.prior.as_ref(),
             mask,
+            attention_rule: head
+                .attention_rule
+                .or(config.default_attention_rule)
+                .unwrap_or(AttentionRule::Softmax),
+            attention_top_k: effective_attention_top_k(
+                head.attention_top_k.or(config.default_attention_top_k),
+                config.top_k,
+                config.keys.len(),
+            ),
             top_k,
         };
         let single =
@@ -405,7 +423,12 @@ fn run_single_attention(
             }
         })
         .collect();
-    let standard_weights = softmax(&scaled_scores);
+    let standard_weights = attention_rule_weights(
+        &scaled_scores,
+        &allowed,
+        params.attention_rule,
+        params.attention_top_k,
+    );
     let standard_output = weighted_sum(&standard_weights, values);
 
     let regularized = solve_kernel_regularized_attention(
@@ -430,6 +453,7 @@ fn run_single_attention(
     Ok(AttentionResult {
         index,
         solver_method: params.solver.method().as_str().to_string(),
+        attention_rule: params.attention_rule.as_str().to_string(),
         query: query.to_vec(),
         scores,
         masked_scores,
@@ -479,6 +503,22 @@ fn apply_mask_to_scores(
         AttentionMaskConfig::Causal => {
             for (key_index, score) in masked.iter_mut().enumerate() {
                 if key_index > query_index {
+                    *score = f64::NEG_INFINITY;
+                }
+            }
+        }
+        AttentionMaskConfig::SlidingWindow { window_size } => {
+            for (key_index, score) in masked.iter_mut().enumerate() {
+                let distance = key_index.abs_diff(query_index);
+                if distance > *window_size {
+                    *score = f64::NEG_INFINITY;
+                }
+            }
+        }
+        AttentionMaskConfig::BlockSparse { block_size } => {
+            let query_block = query_index / *block_size;
+            for (key_index, score) in masked.iter_mut().enumerate() {
+                if key_index / *block_size != query_block {
                     *score = f64::NEG_INFINITY;
                 }
             }
@@ -535,6 +575,38 @@ pub fn softmax(scores: &[f64]) -> Vec<f64> {
     }
 
     exp_values.iter().map(|v| v / sum_exp).collect()
+}
+
+fn attention_rule_weights(
+    scores: &[f64],
+    allowed: &[bool],
+    rule: AttentionRule,
+    top_k: usize,
+) -> Vec<f64> {
+    match rule {
+        AttentionRule::Softmax => softmax(scores),
+        AttentionRule::Sparsemax => {
+            crate::optimization::projections::masked_sparsemax(scores, allowed)
+        }
+        AttentionRule::Entmax15 => {
+            crate::optimization::projections::masked_entmax15(scores, allowed)
+        }
+        AttentionRule::TopK => {
+            crate::optimization::projections::top_k_masked_sparsemax(scores, allowed, top_k)
+        }
+    }
+}
+
+fn effective_attention_top_k(
+    attention_top_k: Option<usize>,
+    metric_top_k: Option<usize>,
+    number_of_keys: usize,
+) -> usize {
+    attention_top_k
+        .or(metric_top_k)
+        .unwrap_or(number_of_keys.min(3))
+        .max(1)
+        .min(number_of_keys.max(1))
 }
 
 /// Calcula una combinación convexa de los vectores de valor.
@@ -979,7 +1051,8 @@ fn format_vector_special(x: &[f64]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{project_to_masked_simplex, project_to_simplex, softmax};
+    use super::{attention_rule_weights, project_to_masked_simplex, project_to_simplex, softmax};
+    use crate::config::AttentionRule;
 
     #[test]
     fn projection_sums_to_one() {
@@ -1003,5 +1076,29 @@ mod tests {
         assert_eq!(weights[1], 0.0);
         let sum: f64 = weights.iter().sum();
         assert!((sum - 1.0).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn sparsemax_rule_can_create_sparse_weights() {
+        let weights = attention_rule_weights(
+            &[3.0, 1.0, -2.0],
+            &[true, true, true],
+            AttentionRule::Sparsemax,
+            2,
+        );
+        assert_eq!(weights[2], 0.0);
+        let sum: f64 = weights.iter().sum();
+        assert!((sum - 1.0).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn top_k_rule_limits_positive_weights() {
+        let weights = attention_rule_weights(
+            &[3.0, 2.0, 1.0, 0.0],
+            &[true, true, true, true],
+            AttentionRule::TopK,
+            2,
+        );
+        assert!(weights.iter().filter(|value| **value > 0.0).count() <= 2);
     }
 }

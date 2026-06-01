@@ -1,0 +1,34 @@
+# Fase 6: atención dispersa con sparsemax.
+dimension: 3
+temperature: 0.75
+kernel_gamma: 1.0
+attention_rule: sparsemax
+top_k: 2
+
+attention_solver:
+  method: projected-gradient
+  initial_step: 0.12
+  tolerance: 1e-8
+  min_step: 1e-10
+  max_iterations: 3000
+
+mask:
+  type: none
+
+queries:
+  - [1.0, 0.2, 0.0]
+  - [0.0, 1.0, 0.4]
+
+keys:
+  - [1.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0]
+  - [0.0, 0.0, 1.0]
+  - [0.7, 0.7, 0.0]
+
+values:
+  - [1.0, 0.0]
+  - [0.0, 1.0]
+  - [0.5, 0.5]
+  - [0.8, 0.8]
+
+prior: [0.20, 0.20, 0.20, 0.40]

@@ -7,7 +7,7 @@ use kavg_lab::attention::{
     run_agent_sweep_with_mode, run_attention_demo_with_mode, run_multihead_attention_demo_with_mode,
 };
 use kavg_lab::config::{
-    AgentSweepConfig, AttentionConfig, AttentionSolverMethod, ExperimentConfig,
+    AgentSweepConfig, AttentionConfig, AttentionRule, AttentionSolverMethod, ExperimentConfig,
     MultiHeadAttentionConfig, SolverMethod,
 };
 use kavg_lab::fenchel::{verify_fenchel_identity, FenchelIdentityInput};
@@ -68,12 +68,16 @@ fn main() -> Result<()> {
         Commands::AttentionDemo {
             config,
             solver,
+            attention_rule,
+            attention_top_k,
             output,
             parallel,
             jobs,
         } => run_attention_demo_command(
             &config,
             solver,
+            attention_rule,
+            attention_top_k,
             output,
             parse_execution_mode(parallel, &jobs)?,
         )?,
@@ -426,6 +430,8 @@ fn run_verify_fenchel(
 fn run_attention_demo_command(
     config: &std::path::Path,
     solver_override: Option<AttentionSolverMethod>,
+    attention_rule_override: Option<AttentionRule>,
+    attention_top_k_override: Option<usize>,
     output: Option<std::path::PathBuf>,
     mode: ExecutionMode,
 ) -> Result<()> {
@@ -433,6 +439,16 @@ fn run_attention_demo_command(
     if let Some(solver) = solver_override {
         experiment.attention_solver.method = Some(solver);
     }
+    if let Some(rule) = attention_rule_override {
+        experiment.attention_rule = Some(rule);
+    }
+
+    if let Some(top_k) = attention_top_k_override {
+        anyhow::ensure!(top_k > 0, "--attention-top-k debe ser mayor que cero.");
+        experiment.attention_top_k = Some(top_k);
+    }
+
+    experiment.validate()?;
     let results = run_attention_demo_with_mode(&experiment, mode)?;
 
     println!("Experimento KAvgLab - Demostracion de atencion");
@@ -443,6 +459,17 @@ fn run_attention_demo_command(
         "attention_solver: {}",
         experiment.attention_solver.method().as_str()
     );
+    println!(
+        "attention_rule: {}",
+        experiment
+            .attention_rule
+            .unwrap_or(AttentionRule::Softmax)
+            .as_str()
+    );
+
+    if let Some(top_k) = experiment.attention_top_k {
+        println!("attention_top_k: {}", top_k);
+    }
     println!(
         "queries: {}, keys/values: {}",
         experiment.queries.len(),

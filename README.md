@@ -1116,3 +1116,49 @@ cargo run --features parallel -- run-suite \
 ```
 
 Si el binario se ejecuta con `--parallel` pero fue compilado sin `--features parallel`, el CLI devuelve un error explícito indicando cómo recompilarlo.
+
+## Fase 6: atención dispersa y optimización regularizada
+
+KAvgLab incorpora mecanismos de atención dispersa para estudiar la atención como un problema de optimización regularizada sobre el simplex, sin convertir el proyecto en un LLM completo.
+
+Reglas soportadas:
+
+- `softmax`
+- `sparsemax`
+- `entmax-1.5`
+- `top-k`
+
+Máscaras estructuradas adicionales:
+
+- `causal`
+- `sliding-window`
+- `block-sparse`
+- `custom`
+
+Ejemplo con sparsemax:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/fase6_attention_sparsemax.yaml \
+  --output sample_outputs/attention_sparsemax.csv
+```
+
+Ejemplo con top-k sparse attention:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/fase6_attention_topk.yaml \
+  --attention-rule top-k \
+  --attention-top-k 2 \
+  --output sample_outputs/attention_topk.csv
+```
+
+Ejemplo con atención local tipo sliding window:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/fase6_attention_local.yaml \
+  --output sample_outputs/attention_local.csv
+```
+
+La fase también agrega `src/optimization/projections.rs` con operadores de proyección para simplex, top-k simplex y una proyección de Dykstra básica para intersecar caja y simplex.
