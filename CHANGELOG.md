@@ -1,3 +1,18 @@
+## [0.11.0] - Fase 7: matemática convexa auditable
+
+### Agregado
+
+- Nuevo comando `prox` para operadores proximales básicos.
+- Soporte proximal para `l1`, `l2`, `elastic-net`, `indicator-box` e `indicator-simplex`.
+- Cálculo opcional de envolvente de Moreau y gradiente de Moreau.
+- Nuevo comando `fenchel-young` para verificar `f(x)+f*(s) >= <x,s>`.
+- Nuevo kernel `bregman-entropy` para geometría entrópica/KL.
+- Ejemplos de funciones independientes en `examples/functions/`.
+
+### Mantenido
+
+- El proyecto sigue siendo CLI puro y no agrega dashboard ni servidor.
+
 # Registro de cambios
 
 ## 0.10.0 - Fase 6: atención dispersa y optimización regularizada

@@ -545,3 +545,84 @@ fn phase6_dykstra_projection_respects_box_and_simplex() {
         .iter()
         .all(|value| *value >= -1.0e-9 && *value <= 0.8 + 1.0e-9));
 }
+
+#[test]
+fn phase7_prox_l1_soft_thresholds_from_yaml() {
+    let config = kavg_lab::prox::load_function_config(&std::path::PathBuf::from(
+        "examples/functions/l1.yaml",
+    ))
+    .expect("l1.yaml debe parsear");
+    let result = kavg_lab::prox::compute_prox(&config, &[1.0, -2.0, 0.05], 0.2)
+        .expect("prox l1 debe ejecutarse");
+    assert_eq!(result.function_name, "l1");
+    assert!((result.prox[0] - 0.9).abs() < 1.0e-12);
+    assert!((result.prox[1] + 1.9).abs() < 1.0e-12);
+    assert_eq!(result.prox[2], 0.0);
+    assert!(result.moreau_value.is_finite());
+}
+
+#[test]
+fn phase7_prox_indicator_simplex_projects_to_simplex() {
+    let config = kavg_lab::prox::load_function_config(&std::path::PathBuf::from(
+        "examples/functions/indicator_simplex.yaml",
+    ))
+    .expect("indicator_simplex.yaml debe parsear");
+    let result = kavg_lab::prox::compute_prox(&config, &[2.0, -1.0, 0.5], 1.0)
+        .expect("prox simplex debe ejecutarse");
+    let sum: f64 = result.prox.iter().sum();
+    assert!((sum - 1.0).abs() < 1.0e-9);
+    assert!(result.prox.iter().all(|value| *value >= 0.0));
+}
+
+#[test]
+fn phase7_fenchel_young_l1_passes() {
+    let config = kavg_lab::prox::load_function_config(&std::path::PathBuf::from(
+        "examples/functions/l1.yaml",
+    ))
+    .expect("l1.yaml debe parsear");
+    let result =
+        kavg_lab::prox::check_fenchel_young(&config, &[1.0, -2.0, 0.5], &[0.2, -0.1, 0.3], 1.0e-8)
+            .expect("Fenchel-Young debe ejecutarse");
+    assert!(result.passed);
+    assert!(result.gap >= -1.0e-8);
+}
+
+#[test]
+fn phase7_bregman_entropy_kernel_parses() {
+    let text = r#"
+dimension: 3
+lambda1: 0.5
+matrix:
+  - [1.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0]
+  - [0.0, 0.0, 1.0]
+
+f1:
+  type: l2
+  alpha: 1.0
+
+f2:
+  type: l2
+  alpha: 1.0
+
+kernel:
+  type: bregman-entropy
+  reference: [1.0, 1.0, 1.0]
+  epsilon: 1.0e-12
+
+solver:
+  method: coordinate-descent
+  initial_step: 0.1
+  tolerance: 1.0e-8
+  max_iterations: 10
+
+points:
+  - [0.2, 0.3, 0.5]
+"#;
+    let experiment: kavg_lab::config::ExperimentConfig =
+        serde_yaml::from_str(text).expect("bregman-entropy debe parsear");
+    let kernel = kavg_lab::kernels::build_kernel(&experiment.kernel)
+        .expect("kernel bregman-entropy debe construirse");
+    assert_eq!(kernel.name(), "bregman-entropy");
+    assert!(kernel.value(&[0.2, 0.3, 0.5]).is_finite());
+}

@@ -56,6 +56,44 @@ pub enum Commands {
         jobs: String,
     },
 
+    /// Calcula operadores proximales y, opcionalmente, el valor de Moreau.
+    Prox {
+        /// YAML de función convexa independiente.
+        #[arg(long)]
+        function: PathBuf,
+
+        /// Punto en formato YAML/JSON, por ejemplo: "[1.0,-2.0,0.5]".
+        #[arg(long)]
+        point: String,
+
+        /// Paso proximal t > 0.
+        #[arg(long)]
+        step: f64,
+
+        /// Muestra explícitamente el valor y gradiente de la envolvente de Moreau.
+        #[arg(long, default_value_t = false)]
+        moreau: bool,
+    },
+
+    /// Verifica la desigualdad de Fenchel-Young f(x)+f*(s) >= <x,s>.
+    FenchelYoung {
+        /// YAML de función convexa independiente.
+        #[arg(long)]
+        function: PathBuf,
+
+        /// Punto primal x en formato YAML/JSON.
+        #[arg(long)]
+        x: String,
+
+        /// Punto dual s en formato YAML/JSON.
+        #[arg(long)]
+        s: String,
+
+        /// Tolerancia para decidir passed.
+        #[arg(long, default_value_t = 1.0e-8)]
+        tolerance: f64,
+    },
+
     /// Compara promedio aritmético, epigráfico y proximal average.
     Compare {
         /// Ruta del archivo de configuración YAML.
