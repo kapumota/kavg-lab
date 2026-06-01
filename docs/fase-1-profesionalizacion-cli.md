@@ -1,8 +1,8 @@
-# Fase 1: profesionalización del CLI sin cambiar su esencia
+### Fase 1: profesionalización del CLI sin cambiar su esencia
 
 Esta fase conserva a KAvgLab como una herramienta de línea de comandos en Rust. No introduce dashboard, interfaz web ni visualizaciones obligatorias. La mejora se concentra en estructura de repositorio, validación automática, trazabilidad y salidas reproducibles.
 
-## Objetivos
+#### Objetivos
 
 - Mantener el uso principal desde terminal.
 - Conservar la salida CSV existente.
@@ -11,7 +11,7 @@ Esta fase conserva a KAvgLab como una herramienta de línea de comandos en Rust.
 - Agregar CI básico para validar formato, compilación, linting, pruebas y build release.
 - Agregar documentación mínima de mantenimiento del proyecto.
 
-## Estructura agregada
+#### Estructura agregada
 
 ```text
 .github/workflows/ci.yml
@@ -24,7 +24,7 @@ sample_outputs/
 LICENSE
 ```
 
-## Flujo local recomendado
+#### Flujo local recomendado
 
 Como el proyecto ya existe en GitHub y se trabaja localmente, la fase se debe aplicar en una rama separada:
 
@@ -82,13 +82,13 @@ kavg-lab compute \
   --manifest sample_outputs/manifest.json
 ```
 
-## Archivos de salida
+#### Archivos de salida
 
 - `results.csv`: salida tabular compatible con el flujo anterior.
 - `results.json`: salida estructurada para auditoría y comparación automática.
 - `manifest.json`: metadatos de ejecución, versión del binario, ruta de configuración, hash del archivo YAML, cantidad de resultados y duración.
 
-## Artefactos que no se deben subir
+#### Artefactos que no se deben subir
 
 Los archivos generados en `sample_outputs/` no deben subirse salvo que sean ejemplos pequeños y deliberados. Por defecto, `.gitignore` excluye:
 
