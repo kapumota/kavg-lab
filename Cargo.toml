@@ -1,6 +1,6 @@
 [package]
 name = "kavg-lab"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 description = "CLI académico para promedios kernel, OSQP y demos de atención tipo Transformer"
 license = "MIT"

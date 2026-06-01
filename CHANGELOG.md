@@ -1,5 +1,20 @@
 # Registro de cambios
 
+## [0.8.0] - Fase 4: experimentación CLI reproducible
+
+### Agregado
+
+- Comando `run-suite` para ejecutar suites reproducibles desde YAML.
+- Generación de paquetes de evidencia con `manifest.json`, `summary.json`, `commands.log`, copia de `suite.yaml` y resultados CSV.
+- Suite de referencia en `experiments/suite.yaml` para `compute`, `verify-fenchel`, `attention-demo` y `compare-solvers`.
+- Documento `docs/fase-4-experimentacion-cli-reproducible.md`.
+
+### Mantenido
+
+- El proyecto sigue siendo un CLI puro.
+- No se agrega dashboard, servidor web ni interfaz gráfica.
+
+
 ## [0.7.0] - Fase 3: solvers y comparación algorítmica
 
 ### Agregado

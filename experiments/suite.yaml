@@ -1,0 +1,23 @@
+name: fase4-suite-reproducible-cli
+
+compute:
+  config: examples/quadratic_l1.yaml
+  output: compute_results.csv
+
+fenchel:
+  config: examples/fenchel_quadratic_l2.yaml
+  output: fenchel_results.csv
+
+attention:
+  config: examples/attention_demo.yaml
+  solver: mirror-descent
+  output: attention_results.csv
+
+compare_solvers:
+  config: examples/fase3_compare_solvers.yaml
+  solvers:
+    - coordinate-descent
+    - subgradient
+    - proximal-gradient
+    - fista
+  output: solver_comparison.csv

@@ -3,3 +3,4 @@
 sample_outputs/*.csv
 sample_outputs/*.json
 !sample_outputs/README.md
+/evidence/
