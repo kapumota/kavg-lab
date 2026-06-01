@@ -1,0 +1,33 @@
+# Fase 6: top-k sparse attention.
+dimension: 3
+temperature: 1.0
+kernel_gamma: 1.0
+attention_rule: top-k
+attention_top_k: 2
+top_k: 2
+
+attention_solver:
+  method: mirror-descent
+  initial_step: 0.10
+  tolerance: 1e-8
+  min_step: 1e-10
+  max_iterations: 3000
+
+mask:
+  type: none
+
+queries:
+  - [1.0, 0.2, 0.0]
+  - [0.0, 1.0, 0.4]
+
+keys:
+  - [1.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0]
+  - [0.0, 0.0, 1.0]
+  - [0.7, 0.7, 0.0]
+
+values:
+  - [1.0, 0.0]
+  - [0.0, 1.0]
+  - [0.5, 0.5]
+  - [0.8, 0.8]

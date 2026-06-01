@@ -475,3 +475,73 @@ fn phase5_parallel_attention_matches_sequential_attention() {
         }
     }
 }
+
+#[test]
+fn phase6_attention_sparsemax_runs_with_yaml() {
+    let config = AttentionConfig::from_yaml_file(&example("fase6_attention_sparsemax.yaml"))
+        .expect("fase6_attention_sparsemax.yaml debe parsear");
+    let results = kavg_lab::attention::run_attention_demo(&config)
+        .expect("sparsemax attention debe ejecutarse");
+    assert!(!results.is_empty());
+    assert!(results
+        .iter()
+        .all(|result| result.attention_rule == "sparsemax"));
+    assert!(results.iter().any(|result| {
+        result
+            .standard_weights
+            .iter()
+            .any(|weight| weight.abs() <= 1.0e-12)
+    }));
+}
+
+#[test]
+fn phase6_attention_topk_limits_positive_standard_weights() {
+    let config = AttentionConfig::from_yaml_file(&example("fase6_attention_topk.yaml"))
+        .expect("fase6_attention_topk.yaml debe parsear");
+    let results =
+        kavg_lab::attention::run_attention_demo(&config).expect("top-k attention debe ejecutarse");
+    assert!(!results.is_empty());
+    for result in results {
+        let positive = result
+            .standard_weights
+            .iter()
+            .filter(|weight| **weight > 1.0e-12)
+            .count();
+        assert!(
+            positive <= 2,
+            "top-k debe conservar a lo más dos pesos positivos"
+        );
+    }
+}
+
+#[test]
+fn phase6_attention_sliding_window_masks_far_tokens() {
+    let config = AttentionConfig::from_yaml_file(&example("fase6_attention_local.yaml"))
+        .expect("fase6_attention_local.yaml debe parsear");
+    let results = kavg_lab::attention::run_attention_demo(&config)
+        .expect("sliding-window attention debe ejecutarse");
+    assert!(!results.is_empty());
+    for result in results {
+        for (key_index, score) in result.masked_scores.iter().enumerate() {
+            let distance = key_index.abs_diff(result.index);
+            if distance > 1 {
+                assert!(score.is_infinite() && score.is_sign_negative());
+            }
+        }
+    }
+}
+
+#[test]
+fn phase6_dykstra_projection_respects_box_and_simplex() {
+    let projected = kavg_lab::optimization::projections::dykstra_project_box_simplex(
+        &[2.0, -1.0, 0.5],
+        &[0.0, 0.0, 0.0],
+        &[0.8, 0.8, 0.8],
+        80,
+    );
+    let sum: f64 = projected.iter().sum();
+    assert!((sum - 1.0).abs() < 1.0e-6);
+    assert!(projected
+        .iter()
+        .all(|value| *value >= -1.0e-9 && *value <= 0.8 + 1.0e-9));
+}

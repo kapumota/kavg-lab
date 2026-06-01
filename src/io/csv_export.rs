@@ -137,6 +137,7 @@ pub fn export_attention_results(path: &Path, results: &[AttentionResult]) -> Res
     writer.write_record([
         "index",
         "solver_method",
+        "attention_rule",
         "query",
         "scores",
         "masked_scores",
@@ -167,6 +168,7 @@ pub fn export_attention_results(path: &Path, results: &[AttentionResult]) -> Res
         writer.write_record([
             result.index.to_string(),
             result.solver_method.clone(),
+            result.attention_rule.clone(),
             result.query_csv(),
             result.scores_csv(),
             result.masked_scores_csv(),

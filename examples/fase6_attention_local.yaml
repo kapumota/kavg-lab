@@ -1,0 +1,35 @@
+# Fase 6: máscara local tipo sliding window.
+dimension: 3
+temperature: 0.8
+kernel_gamma: 1.2
+attention_rule: entmax-1.5
+top_k: 2
+
+attention_solver:
+  method: frank-wolfe
+  initial_step: 0.25
+  tolerance: 1e-8
+  min_step: 1e-10
+  max_iterations: 3000
+
+mask:
+  type: sliding-window
+  window_size: 1
+
+queries:
+  - [1.0, 0.2, 0.0]
+  - [0.0, 1.0, 0.4]
+  - [0.3, 0.1, 1.0]
+  - [0.5, 0.5, 0.2]
+
+keys:
+  - [1.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0]
+  - [0.0, 0.0, 1.0]
+  - [0.7, 0.7, 0.0]
+
+values:
+  - [1.0, 0.0]
+  - [0.0, 1.0]
+  - [0.5, 0.5]
+  - [0.8, 0.8]

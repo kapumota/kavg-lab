@@ -1,5 +1,14 @@
 # Registro de cambios
 
+## 0.10.0 - Fase 6: atención dispersa y optimización regularizada
+
+- Agrega reglas de atención `sparsemax`, `entmax-1.5` y `top-k`.
+- Agrega máscaras estructuradas `sliding-window` y `block-sparse`.
+- Agrega `src/optimization/projections.rs` con proyección al simplex, top-k simplex y Dykstra básico para caja ∩ simplex.
+- Permite sobrescribir `attention-demo` con `--attention-rule` y `--attention-top-k`.
+- Agrega ejemplos YAML de atención dispersa, local y block-sparse.
+
+
 ## [0.8.0] - Fase 4: experimentación CLI reproducible
 
 ### Agregado

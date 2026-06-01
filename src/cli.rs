@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use kavg_lab::config::AttentionSolverMethod;
+use kavg_lab::config::{AttentionRule, AttentionSolverMethod};
 use std::path::PathBuf;
 
 /// CLI  para experimentar con promedios kernel, OSQP y atención regularizada.
@@ -118,6 +118,14 @@ pub enum Commands {
         /// Sobrescribe el solver del YAML: projected-gradient, mirror-descent o frank-wolfe.
         #[arg(long)]
         solver: Option<AttentionSolverMethod>,
+
+        /// Sobrescribe la regla base de atención: softmax, sparsemax, entmax-1.5 o top-k.
+        #[arg(long = "attention-rule")]
+        attention_rule: Option<AttentionRule>,
+
+        /// K usado cuando --attention-rule top-k.
+        #[arg(long = "attention-top-k")]
+        attention_top_k: Option<usize>,
 
         /// Ruta opcional para exportar los resultados en CSV.
         #[arg(short, long)]
