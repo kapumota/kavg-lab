@@ -216,6 +216,29 @@ pub enum Commands {
         jobs: String,
     },
 
+    /// Perfila agent-sweep y exporta estadísticas de tiempo en CSV sin dashboard.
+    Profile {
+        /// Ruta del YAML de agent-sweep que se desea perfilar.
+        #[arg(long)]
+        config: PathBuf,
+
+        /// Cantidad de repeticiones medidas.
+        #[arg(long, default_value_t = 30)]
+        repeat: usize,
+
+        /// Ruta de salida CSV con columnas mean/min/max/std.
+        #[arg(short, long)]
+        output: PathBuf,
+
+        /// Ejecuta el perfilado con paralelismo si está disponible la feature parallel.
+        #[arg(long, default_value_t = false)]
+        parallel: bool,
+
+        /// Número de workers para Rayon: auto o entero positivo.
+        #[arg(long, default_value = "auto")]
+        jobs: String,
+    },
+
     /// Ejecuta un barrido experimental sobre gamma, temperature y priors.
     AgentSweep {
         /// Ruta del archivo de configuración YAML del barrido.
