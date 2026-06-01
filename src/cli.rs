@@ -111,6 +111,17 @@ pub enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Ejecuta una suite reproducible y genera un paquete de evidencia CLI.
+    RunSuite {
+        /// Ruta del archivo YAML de suite reproducible.
+        #[arg(long)]
+        suite: PathBuf,
+
+        /// Directorio de salida para el paquete de evidencia.
+        #[arg(long)]
+        out: PathBuf,
+    },
+
     /// Ejecuta un barrido experimental sobre gamma, temperature y priors.
     AgentSweep {
         /// Ruta del archivo de configuración YAML del barrido.

@@ -1039,3 +1039,33 @@ cargo run -- compare-solvers \
 ```
 
 El comando `compare-solvers` convierte el proyecto en un laboratorio CLI para comparar valor objetivo, iteraciones, métrica del solver y estado de cada método sobre los mismos puntos de entrada.
+
+## Fase 4: suites reproducibles desde CLI
+
+KAvgLab puede ejecutar una suite experimental completa sin dashboard ni servidor web. El comando `run-suite` recibe un YAML declarativo y genera un paquete de evidencia con metadatos, comandos equivalentes y resultados tabulares.
+
+```bash
+kavg-lab run-suite \
+  --suite experiments/suite.yaml \
+  --out evidence/run_001
+```
+
+La estructura generada es:
+
+```text
+evidence/run_001/
+├── manifest.json
+├── suite.yaml
+├── commands.log
+├── compute_results.csv
+├── fenchel_results.csv
+├── attention_results.csv
+├── solver_comparison.csv
+├── summary.json
+└── README.md
+```
+
+El archivo `manifest.json` registra la versión de `kavg-lab`, `rustc`, hora de inicio y fin, hash de configuración, commit Git detectado y estado final. El archivo `commands.log` deja los comandos CLI equivalentes a cada paso de la suite.
+
+El directorio `evidence/` está ignorado por Git para evitar subir artefactos de ejecución. Si se desea publicar una corrida, conviene empaquetarla o adjuntarla explícitamente como evidencia externa.
+

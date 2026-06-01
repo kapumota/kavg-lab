@@ -22,6 +22,7 @@ use kavg_lab::optimization::averages::AverageKind;
 use kavg_lab::optimization::comparison::compare_averages;
 use kavg_lab::optimization::kernel_average::{solve_kernel_average, KernelAverageInput};
 use kavg_lab::optimization::solver_comparison::compare_solvers_for_points;
+use kavg_lab::suite::run_suite;
 use std::time::SystemTime;
 
 fn main() -> Result<()> {
@@ -49,6 +50,7 @@ fn main() -> Result<()> {
         Commands::MultiheadAttentionDemo { config, output } => {
             run_multihead_attention_demo_command(&config, output)?
         }
+        Commands::RunSuite { suite, out } => run_suite(&suite, &out)?,
         Commands::AgentSweep { config, output } => run_agent_sweep_command(&config, output)?,
     }
 
