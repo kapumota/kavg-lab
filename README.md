@@ -1214,3 +1214,65 @@ kernel:
   epsilon: 1.0e-12
 ```
 
+
+
+## Fase 8: pruebas de propiedades y benchmarking CLI
+
+La Fase 8 cierra el proyecto con verificación generativa y medición de rendimiento sin agregar dashboard. Se incorporan pruebas basadas en propiedades con `proptest`, benchmarks con Criterion y un comando CLI liviano para perfilar `agent-sweep`.
+
+### Property-based testing
+
+La suite agrega pruebas que generan entradas automáticamente y verifican invariantes generales:
+
+- pesos de atención y proyecciones sobre simplex suman 1;
+- pesos son no negativos;
+- top-k sparse attention deja como máximo `k` entradas positivas;
+- kernels cuadráticos no producen valores negativos bajo geometrías válidas;
+- resultados secuenciales/paralelos preservan cantidad y orden lógico.
+
+```bash
+cargo test --all-targets
+cargo test --all-targets --features parallel
+```
+
+### Benchmarks sin dashboard
+
+Los benchmarks usan Criterion y se ejecutan con:
+
+```bash
+cargo bench
+```
+
+En CI se compilan con:
+
+```bash
+cargo bench --no-run
+```
+
+### Comando profile
+
+`profile` mide una suite `agent-sweep` varias veces y exporta estadísticas en CSV:
+
+```bash
+cargo run -- profile \
+  --config examples/attention_sweep.yaml \
+  --repeat 30 \
+  --output sample_outputs/profile.csv
+```
+
+Con paralelismo:
+
+```bash
+cargo run --features parallel -- profile \
+  --config examples/attention_sweep.yaml \
+  --repeat 30 \
+  --parallel \
+  --jobs auto \
+  --output sample_outputs/profile_parallel.csv
+```
+
+Columnas generadas:
+
+```text
+experiment,dimension,n_queries,n_keys,solver,parallel,jobs,repeat,mean_ms,min_ms,max_ms,std_ms
+```

@@ -1,6 +1,6 @@
 [package]
 name = "kavg-lab"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2021"
 description = "CLI académico para promedios kernel, OSQP y demos de atención tipo Transformer"
 license = "MIT"
@@ -18,3 +18,23 @@ serde_yaml = "0.9"
 rayon = { version = "1", optional = true }
 
 osqp = "0.6.3"
+
+[dev-dependencies]
+proptest = "1"
+criterion = "0.5"
+
+[[bench]]
+name = "kernel_average_bench"
+harness = false
+
+[[bench]]
+name = "attention_bench"
+harness = false
+
+[[bench]]
+name = "sweep_bench"
+harness = false
+
+[[bench]]
+name = "simplex_projection_bench"
+harness = false

@@ -41,3 +41,6 @@ jobs:
 
       - name: Build release con feature parallel
         run: cargo build --release --features parallel
+
+      - name: Compilacion de benchmarks
+        run: cargo bench --no-run
