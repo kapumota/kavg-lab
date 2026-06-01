@@ -84,7 +84,7 @@ rustup --version
 3. Aceptar la instalación por defecto.
 4. Si el instalador lo solicita, instalar **Visual Studio C++ Build Tools**.
 
-### 3.2 Verificar en PowerShell
+##### 3.2 Verificar en PowerShell
 
 Abrir una nueva ventana de PowerShell y ejecutar:
 
@@ -561,7 +561,7 @@ Usa OSQP como backend alternativo cuando el problema puede expresarse como QP.
 ```
 
 
-#### 16. Demos de atención, Transformers, LLM y MLLM
+#### 16. Demostración de atención, Transformers, LLM y MLLM
 
 ##### 16.1 Attention demostración base
 
@@ -859,7 +859,6 @@ Lectura rápida:
 El agente experimental ordena configuraciones según el objetivo balanced-tradeoff.
 ```
 
-
 > La principal contribución del MVP es tender un puente entre teoría convexa y mecanismos de inteligencia artificial. La atención regularizada
 > implementada en el software permite reinterpretar una parte central de los Transformers como un problema de optimización: los pesos de atención no se calculan únicamente a partir de compatibilidades entre vectores, sino que también pueden incorporar priors, restricciones, máscaras y regularización.
 
@@ -1040,7 +1039,7 @@ cargo run -- compare-solvers \
 
 El comando `compare-solvers` convierte el proyecto en un laboratorio CLI para comparar valor objetivo, iteraciones, métrica del solver y estado de cada método sobre los mismos puntos de entrada.
 
-## Fase 4: suites reproducibles desde CLI
+#### Fase 4: suites reproducibles desde CLI
 
 KAvgLab puede ejecutar una suite experimental completa sin dashboard ni servidor web. El comando `run-suite` recibe un YAML declarativo y genera un paquete de evidencia con metadatos, comandos equivalentes y resultados tabulares.
 
@@ -1070,7 +1069,7 @@ El archivo `manifest.json` registra la versión de `kavg-lab`, `rustc`, hora de 
 El directorio `evidence/` está ignorado por Git para evitar subir artefactos de ejecución. Si se desea publicar una corrida, conviene empaquetarla o adjuntarla explícitamente como evidencia externa.
 
 
-## Fase 5: paralelismo determinista opcional
+#### Fase 5: paralelismo determinista opcional
 
 KAvgLab mantiene ejecución secuencial por defecto, pero puede compilarse con una feature opcional de paralelismo basada en Rayon:
 
@@ -1117,7 +1116,7 @@ cargo run --features parallel -- run-suite \
 
 Si el binario se ejecuta con `--parallel` pero fue compilado sin `--features parallel`, el CLI devuelve un error explícito indicando cómo recompilarlo.
 
-## Fase 6: atención dispersa y optimización regularizada
+#### Fase 6: atención dispersa y optimización regularizada
 
 KAvgLab incorpora mecanismos de atención dispersa para estudiar la atención como un problema de optimización regularizada sobre el simplex, sin convertir el proyecto en un LLM completo.
 
@@ -1163,11 +1162,11 @@ cargo run -- attention-demo \
 
 La fase también agrega `src/optimization/projections.rs` con operadores de proyección para simplex, top-k simplex y una proyección de Dykstra básica para intersecar caja y simplex.
 
-## Fase 7: matemática convexa auditable
+#### Fase 7: matemática convexa auditable
 
 La Fase 7 agrega comandos pequeños para verificar propiedades matemáticas y calcular operadores fundamentales de optimización convexa. El objetivo es hacer que KAvgLab sea más auditable sin dejar de ser un CLI.
 
-### Operadores proximales
+##### Operadores proximales
 
 ```bash
 cargo run -- prox \
@@ -1185,7 +1184,7 @@ Casos soportados inicialmente:
 - `indicator-box`: proyección a caja.
 - `indicator-simplex`: proyección al simplex.
 
-### Fenchel-Young
+##### Fenchel-Young
 
 ```bash
 cargo run -- fenchel-young \
@@ -1203,7 +1202,7 @@ El comando reporta:
 - `relative_gap`
 - `passed`
 
-### Geometría Bregman entrópica
+##### Geometría Bregman entrópica
 
 Además de los kernels anteriores, se agrega `bregman-entropy` como divergencia de Bregman inducida por entropía negativa. Esta geometría conecta con KL, mirror descent y atención regularizada sobre simplex.
 
@@ -1214,20 +1213,18 @@ kernel:
   epsilon: 1.0e-12
 ```
 
-
-
-## Fase 8: pruebas de propiedades y benchmarking CLI
+#### Fase 8: pruebas de propiedades y benchmarking CLI
 
 La Fase 8 cierra el proyecto con verificación generativa y medición de rendimiento sin agregar dashboard. Se incorporan pruebas basadas en propiedades con `proptest`, benchmarks con Criterion y un comando CLI liviano para perfilar `agent-sweep`.
 
-### Property-based testing
+##### Property-based testing
 
 La suite agrega pruebas que generan entradas automáticamente y verifican invariantes generales:
 
-- pesos de atención y proyecciones sobre simplex suman 1;
-- pesos son no negativos;
-- top-k sparse attention deja como máximo `k` entradas positivas;
-- kernels cuadráticos no producen valores negativos bajo geometrías válidas;
+- pesos de atención y proyecciones sobre simplex suman 1,
+- pesos son no negativos,
+- top-k sparse attention deja como máximo `k` entradas positivas,
+- kernels cuadráticos no producen valores negativos bajo geometrías válidas,
 - resultados secuenciales/paralelos preservan cantidad y orden lógico.
 
 ```bash
@@ -1235,7 +1232,7 @@ cargo test --all-targets
 cargo test --all-targets --features parallel
 ```
 
-### Benchmarks sin dashboard
+##### Benchmarks sin dashboard
 
 Los benchmarks usan Criterion y se ejecutan con:
 
@@ -1249,7 +1246,7 @@ En CI se compilan con:
 cargo bench --no-run
 ```
 
-### Comando profile
+##### Comando profile
 
 `profile` mide una suite `agent-sweep` varias veces y exporta estadísticas en CSV:
 
