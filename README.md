@@ -1069,3 +1069,50 @@ El archivo `manifest.json` registra la versión de `kavg-lab`, `rustc`, hora de 
 
 El directorio `evidence/` está ignorado por Git para evitar subir artefactos de ejecución. Si se desea publicar una corrida, conviene empaquetarla o adjuntarla explícitamente como evidencia externa.
 
+
+## Fase 5: paralelismo determinista opcional
+
+KAvgLab mantiene ejecución secuencial por defecto, pero puede compilarse con una feature opcional de paralelismo basada en Rayon:
+
+```bash
+cargo run --features parallel -- compute \
+  --config examples/quadratic_l1.yaml \
+  --parallel \
+  --jobs auto \
+  --output sample_outputs/compute_parallel.csv
+```
+
+Comandos con soporte `--parallel`:
+
+```text
+compute
+verify-fenchel
+compare-solvers
+attention-demo
+multihead-attention-demo
+agent-sweep
+run-suite
+```
+
+Ejemplo de comparación de solvers en paralelo:
+
+```bash
+cargo run --features parallel -- compare-solvers \
+  --config examples/fase3_compare_solvers.yaml \
+  --solvers coordinate-descent,subgradient,osqp,proximal-gradient,fista \
+  --parallel \
+  --jobs auto \
+  --output sample_outputs/solver_comparison.csv
+```
+
+Ejemplo de suite reproducible paralela:
+
+```bash
+cargo run --features parallel -- run-suite \
+  --suite experiments/suite.yaml \
+  --out evidence/run_parallel_001 \
+  --parallel \
+  --jobs auto
+```
+
+Si el binario se ejecuta con `--parallel` pero fue compilado sin `--features parallel`, el CLI devuelve un error explícito indicando cómo recompilarlo.

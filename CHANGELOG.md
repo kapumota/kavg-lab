@@ -73,3 +73,13 @@ El formato sigue una convención simple inspirada en Keep a Changelog y versiona
 - CLI para promedios kernel, comparación de promedios convexos, verificación de Fenchel y demostraciones de atención regularizada.
 - Ejemplos YAML para experimentos convexos, atención, multi-head attention, cross-attention sintético y agent sweep.
 - Exportación CSV para los principales comandos.
+
+## 0.9.0 - Fase 5: paralelismo determinista
+
+- Agrega feature opcional `parallel` basada en Rayon.
+- Agrega flags `--parallel` y `--jobs` a comandos CLI con unidades independientes.
+- Paraleliza puntos de `compute` y `verify-fenchel` cuando se compila con `--features parallel`.
+- Paraleliza combinaciones `solver × punto` en `compare-solvers`.
+- Paraleliza queries de `attention-demo`, consultas de `multihead-attention-demo` y configuraciones de `agent-sweep`.
+- Permite que `run-suite` propague el modo paralelo a pasos internos y deje la ejecución registrada en `commands.log`.
+- Mantiene ejecución secuencial como comportamiento por defecto.

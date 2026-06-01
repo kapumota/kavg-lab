@@ -37,7 +37,7 @@ pub struct QuadraticForm {
 
 /// Interfaz común para funciones convexas.
 /// Los nombres de métodos están en inglés; los comentarios están en español.
-pub trait ConvexFunction {
+pub trait ConvexFunction: Send + Sync {
     fn name(&self) -> &'static str;
     fn value(&self, x: &[f64]) -> f64;
     fn subgradient(&self, x: &[f64]) -> Vec<f64>;

@@ -29,3 +29,15 @@ jobs:
 
       - name: Build release
         run: cargo build --release
+
+      - name: Compilacion con feature parallel
+        run: cargo check --all-targets --features parallel
+
+      - name: Clippy con feature parallel
+        run: cargo clippy --all-targets --features parallel -- -D warnings
+
+      - name: Pruebas con feature parallel
+        run: cargo test --all-targets --features parallel
+
+      - name: Build release con feature parallel
+        run: cargo build --release --features parallel
