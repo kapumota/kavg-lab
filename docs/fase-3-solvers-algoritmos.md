@@ -1,8 +1,8 @@
-# Fase 3: solvers, algoritmos y comparación desde CLI
+### Fase 3: solvers, algoritmos y comparación desde CLI
 
 Esta fase mantiene la identidad del proyecto como herramienta de línea de comandos y agrega una capa algorítmica más fuerte. El objetivo no es crear una interfaz gráfica, sino convertir `kavg-lab` en un laboratorio CLI para comparar métodos de optimización aplicados a promedios kernel y atención regularizada.
 
-## Solvers convexos agregados
+#### Solvers convexos agregados
 
 Además de `coordinate-descent`, `subgradient` y `osqp`, se agregan métodos experimentales:
 
@@ -12,7 +12,7 @@ Además de `coordinate-descent`, `subgradient` y `osqp`, se agregan métodos exp
 
 El soporte OSQP sigue siendo parcial y está orientado a casos cuadráticos compatibles. Los nuevos métodos se integran al mismo flujo YAML mediante `solver.method`.
 
-## Solvers para atención sobre simplex
+#### Solvers para atención sobre simplex
 
 Para atención regularizada, los pesos viven en el simplex:
 
@@ -29,7 +29,7 @@ Por eso esta fase agrega tres métodos orientados a esa geometría:
 
 `mirror-descent` usa actualizaciones multiplicativas y es natural para distribuciones de probabilidad. `frank-wolfe` produce actualizaciones hacia vértices del simplex, útil para estudiar atención más dispersa.
 
-## Uso desde CLI
+#### Uso desde CLI
 
 Ejecutar atención con mirror descent:
 
@@ -58,13 +58,13 @@ cargo run -- compare-solvers \
   --output sample_outputs/solver_comparison.csv
 ```
 
-## Alcance
+#### Alcance
 
 Esta fase no afirma que todos los métodos sean solvers industriales completos. Se agregan como implementaciones experimentales y comparables, útiles para enseñanza avanzada, investigación reproducible y análisis de comportamiento algorítmico.
 
 Una fase posterior debería reforzar:
 
-- operadores proximales específicos por función;
-- ADMM con separación primal-dual más formal;
-- restricciones duras generales para OSQP;
+- operadores proximales específicos por función,
+- ADMM con separación primal-dual más formal,
+- restricciones duras generales para OSQP,
 - pruebas de propiedades y benchmarks sistemáticos.
