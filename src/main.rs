@@ -3,7 +3,9 @@ mod cli;
 use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Commands};
-use kavg_lab::attention::{run_agent_sweep, run_attention_demo, run_multihead_attention_demo};
+use kavg_lab::attention::{
+    run_agent_sweep_with_mode, run_attention_demo_with_mode, run_multihead_attention_demo_with_mode,
+};
 use kavg_lab::config::{
     AgentSweepConfig, AttentionConfig, AttentionSolverMethod, ExperimentConfig,
     MultiHeadAttentionConfig, SolverMethod,
@@ -21,8 +23,9 @@ use kavg_lab::kernels::build_kernel;
 use kavg_lab::optimization::averages::AverageKind;
 use kavg_lab::optimization::comparison::compare_averages;
 use kavg_lab::optimization::kernel_average::{solve_kernel_average, KernelAverageInput};
-use kavg_lab::optimization::solver_comparison::compare_solvers_for_points;
-use kavg_lab::suite::run_suite;
+use kavg_lab::optimization::solver_comparison::compare_solvers_for_points_with_mode;
+use kavg_lab::parallel::{parse_execution_mode, ExecutionMode};
+use kavg_lab::suite::run_suite_with_mode;
 use std::time::SystemTime;
 
 fn main() -> Result<()> {
@@ -34,24 +37,68 @@ fn main() -> Result<()> {
             output,
             json_output,
             manifest,
-        } => run_compute(&config, output, json_output, manifest)?,
+            parallel,
+            jobs,
+        } => run_compute(
+            &config,
+            output,
+            json_output,
+            manifest,
+            parse_execution_mode(parallel, &jobs)?,
+        )?,
         Commands::Compare { config, output } => run_compare(&config, output)?,
         Commands::CompareSolvers {
             config,
             solvers,
             output,
-        } => run_compare_solvers(&config, solvers, output)?,
-        Commands::VerifyFenchel { config, output } => run_verify_fenchel(&config, output)?,
+            parallel,
+            jobs,
+        } => run_compare_solvers(
+            &config,
+            solvers,
+            output,
+            parse_execution_mode(parallel, &jobs)?,
+        )?,
+        Commands::VerifyFenchel {
+            config,
+            output,
+            parallel,
+            jobs,
+        } => run_verify_fenchel(&config, output, parse_execution_mode(parallel, &jobs)?)?,
         Commands::AttentionDemo {
             config,
             solver,
             output,
-        } => run_attention_demo_command(&config, solver, output)?,
-        Commands::MultiheadAttentionDemo { config, output } => {
-            run_multihead_attention_demo_command(&config, output)?
-        }
-        Commands::RunSuite { suite, out } => run_suite(&suite, &out)?,
-        Commands::AgentSweep { config, output } => run_agent_sweep_command(&config, output)?,
+            parallel,
+            jobs,
+        } => run_attention_demo_command(
+            &config,
+            solver,
+            output,
+            parse_execution_mode(parallel, &jobs)?,
+        )?,
+        Commands::MultiheadAttentionDemo {
+            config,
+            output,
+            parallel,
+            jobs,
+        } => run_multihead_attention_demo_command(
+            &config,
+            output,
+            parse_execution_mode(parallel, &jobs)?,
+        )?,
+        Commands::RunSuite {
+            suite,
+            out,
+            parallel,
+            jobs,
+        } => run_suite_with_mode(&suite, &out, parse_execution_mode(parallel, &jobs)?)?,
+        Commands::AgentSweep {
+            config,
+            output,
+            parallel,
+            jobs,
+        } => run_agent_sweep_command(&config, output, parse_execution_mode(parallel, &jobs)?)?,
     }
 
     Ok(())
@@ -62,6 +109,7 @@ fn run_compute(
     output: Option<std::path::PathBuf>,
     json_output: Option<std::path::PathBuf>,
     manifest: Option<std::path::PathBuf>,
+    mode: ExecutionMode,
 ) -> Result<()> {
     let started_at = SystemTime::now();
     let experiment = ExperimentConfig::from_yaml_file(config)?;
@@ -69,7 +117,6 @@ fn run_compute(
     let f2 = build_function(&experiment.f2)?;
     let kernel = build_kernel(&experiment.kernel)?;
 
-    let mut results = Vec::new();
     let lambda1 = experiment.lambda1;
     let lambda2 = 1.0 - lambda1;
 
@@ -79,9 +126,10 @@ fn run_compute(
     println!("kernel: {}", kernel.name());
     println!("solver: {}", experiment.solver.method().as_str());
     println!("lambda1: {:.6}, lambda2: {:.6}", lambda1, lambda2);
+    println!("modo ejecución: {}", mode.label());
     println!();
 
-    for (index, point) in experiment.points.iter().enumerate() {
+    let results = kavg_lab::parallel::map_indexed(&experiment.points, mode, |index, point| {
         let input = KernelAverageInput {
             f1: f1.as_ref(),
             f2: f2.as_ref(),
@@ -93,9 +141,15 @@ fn run_compute(
         };
 
         let result = solve_kernel_average(input)?;
+        Ok(result.with_index_and_point(index, point.clone()))
+    })?;
 
-        println!("Punto #{index}");
-        println!("  x                 = {:?}", point);
+    for result in &results {
+        match result.index {
+            Some(index) => println!("Punto #{}", index),
+            None => println!("Punto #sin-indice"),
+        }
+        println!("  x                 = {:?}", result.point);
         println!("  P(x)              = {:.10}", result.value);
         println!("  y1                = {:?}", result.y1);
         println!("  y2                = {:?}", result.y2);
@@ -104,8 +158,6 @@ fn run_compute(
         println!("  iteraciones       = {}", result.iterations);
         println!("  métrica solver    = {:.6e}", result.solver_metric);
         println!();
-
-        results.push(result.with_index_and_point(index, point.clone()));
     }
 
     if let Some(path) = output.as_ref() {
@@ -209,6 +261,7 @@ fn run_compare_solvers(
     config: &std::path::Path,
     solvers: Vec<String>,
     output: Option<std::path::PathBuf>,
+    mode: ExecutionMode,
 ) -> Result<()> {
     let experiment = ExperimentConfig::from_yaml_file(config)?;
     let f1 = build_function(&experiment.f1)?;
@@ -229,9 +282,10 @@ fn run_compare_solvers(
             .collect::<Vec<_>>()
             .join(", ")
     );
+    println!("modo ejecución: {}", mode.label());
     println!();
 
-    let results = compare_solvers_for_points(
+    let results = compare_solvers_for_points_with_mode(
         &experiment.points,
         f1.as_ref(),
         f2.as_ref(),
@@ -239,7 +293,8 @@ fn run_compare_solvers(
         experiment.lambda1,
         &experiment.solver,
         &methods,
-    );
+        mode,
+    )?;
 
     for result in &results {
         if result.status == "ok" {
@@ -277,7 +332,11 @@ fn parse_solver_methods(values: &[String]) -> Result<Vec<SolverMethod>> {
     values.iter().map(|value| value.parse()).collect()
 }
 
-fn run_verify_fenchel(config: &std::path::Path, output: Option<std::path::PathBuf>) -> Result<()> {
+fn run_verify_fenchel(
+    config: &std::path::Path,
+    output: Option<std::path::PathBuf>,
+    mode: ExecutionMode,
+) -> Result<()> {
     let experiment = ExperimentConfig::from_yaml_file(config)?;
     let f1 = build_function(&experiment.f1)?;
     let f2 = build_function(&experiment.f2)?;
@@ -285,7 +344,6 @@ fn run_verify_fenchel(config: &std::path::Path, output: Option<std::path::PathBu
     let f2_star = build_conjugate_function(&experiment.f2)?;
     let kernel = build_kernel(&experiment.kernel)?;
 
-    let mut results = Vec::new();
     let lambda1 = experiment.lambda1;
     let lambda2 = 1.0 - lambda1;
 
@@ -298,23 +356,30 @@ fn run_verify_fenchel(config: &std::path::Path, output: Option<std::path::PathBu
     println!("solver: {}", experiment.solver.method().as_str());
     println!("lambda1: {:.6}, lambda2: {:.6}", lambda1, lambda2);
     println!("Nota: en verify-fenchel, points se interpreta como lista de puntos duales s.");
+    println!("modo ejecución: {}", mode.label());
     println!();
 
-    for (index, dual_point) in experiment.points.iter().enumerate() {
-        let result = verify_fenchel_identity(FenchelIdentityInput {
-            index,
-            dual_point,
-            f1: f1.as_ref(),
-            f2: f2.as_ref(),
-            f1_star: f1_star.as_ref(),
-            f2_star: f2_star.as_ref(),
-            kernel: kernel.as_ref(),
-            lambda1,
-            solver: &experiment.solver,
+    let results =
+        kavg_lab::parallel::map_indexed(&experiment.points, mode, |index, dual_point| {
+            verify_fenchel_identity(FenchelIdentityInput {
+                index,
+                dual_point,
+                f1: f1.as_ref(),
+                f2: f2.as_ref(),
+                f1_star: f1_star.as_ref(),
+                f2_star: f2_star.as_ref(),
+                kernel: kernel.as_ref(),
+                lambda1,
+                solver: &experiment.solver,
+            })
         })?;
 
-        println!("Punto dual #{index}");
-        println!("  s                                = {:?}", dual_point);
+    for result in &results {
+        println!("Punto dual #{}", result.index);
+        println!(
+            "  s                                = {:?}",
+            result.dual_point
+        );
         println!(
             "  lado izquierdo aproximado         = {:.10}",
             result.left_approx
@@ -348,8 +413,6 @@ fn run_verify_fenchel(config: &std::path::Path, output: Option<std::path::PathBu
             result.right_y2
         );
         println!();
-
-        results.push(result);
     }
 
     if let Some(path) = output {
@@ -364,12 +427,13 @@ fn run_attention_demo_command(
     config: &std::path::Path,
     solver_override: Option<AttentionSolverMethod>,
     output: Option<std::path::PathBuf>,
+    mode: ExecutionMode,
 ) -> Result<()> {
     let mut experiment = AttentionConfig::from_yaml_file(config)?;
     if let Some(solver) = solver_override {
         experiment.attention_solver.method = Some(solver);
     }
-    let results = run_attention_demo(&experiment)?;
+    let results = run_attention_demo_with_mode(&experiment, mode)?;
 
     println!("Experimento KAvgLab - Demostracion de atencion");
     println!("dimension de queries/keys: {}", experiment.dimension);
@@ -384,6 +448,7 @@ fn run_attention_demo_command(
         experiment.queries.len(),
         experiment.keys.len()
     );
+    println!("modo ejecución: {}", mode.label());
     println!();
 
     for result in &results {
@@ -469,9 +534,10 @@ fn run_attention_demo_command(
 fn run_multihead_attention_demo_command(
     config: &std::path::Path,
     output: Option<std::path::PathBuf>,
+    mode: ExecutionMode,
 ) -> Result<()> {
     let experiment = MultiHeadAttentionConfig::from_yaml_file(config)?;
-    let results = run_multihead_attention_demo(&experiment)?;
+    let results = run_multihead_attention_demo_with_mode(&experiment, mode)?;
 
     println!("Experimento KAvgLab - Demostracion Multi-head");
     println!("dimension de queries/keys: {}", experiment.dimension);
@@ -485,6 +551,7 @@ fn run_multihead_attention_demo_command(
         "solver por defecto: {}",
         experiment.default_attention_solver.method().as_str()
     );
+    println!("modo ejecución: {}", mode.label());
     println!();
 
     for result in &results {
@@ -534,12 +601,14 @@ fn run_multihead_attention_demo_command(
 fn run_agent_sweep_command(
     config: &std::path::Path,
     output: Option<std::path::PathBuf>,
+    mode: ExecutionMode,
 ) -> Result<()> {
     let experiment = AgentSweepConfig::from_yaml_file(config)?;
-    let results = run_agent_sweep(&experiment)?;
+    let results = run_agent_sweep_with_mode(&experiment, mode)?;
 
     println!("Experimento KAvgLab - Agent Sweep");
     println!("objetivo: {}", experiment.objective.as_str());
+    println!("modo ejecución: {}", mode.label());
     println!("candidatos devueltos: {}", results.len());
     println!();
 

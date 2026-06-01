@@ -46,6 +46,14 @@ pub enum Commands {
         /// Ruta opcional para exportar un manifiesto reproducible de la ejecución.
         #[arg(long)]
         manifest: Option<PathBuf>,
+
+        /// Ejecuta los puntos de forma paralela si el binario fue compilado con --features parallel.
+        #[arg(long, default_value_t = false)]
+        parallel: bool,
+
+        /// Número de workers para Rayon: auto o entero positivo.
+        #[arg(long, default_value = "auto")]
+        jobs: String,
     },
 
     /// Compara promedio aritmético, epigráfico y proximal average.
@@ -72,6 +80,14 @@ pub enum Commands {
         /// Ruta opcional para exportar la comparación en CSV.
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Ejecuta combinaciones solver × punto en paralelo si está disponible la feature parallel.
+        #[arg(long, default_value_t = false)]
+        parallel: bool,
+
+        /// Número de workers para Rayon: auto o entero positivo.
+        #[arg(long, default_value = "auto")]
+        jobs: String,
     },
 
     /// Verifica numéricamente la identidad de Fenchel del kernel average.
@@ -83,6 +99,14 @@ pub enum Commands {
         /// Ruta opcional para exportar la verificación en CSV.
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Ejecuta puntos duales en paralelo si está disponible la feature parallel.
+        #[arg(long, default_value_t = false)]
+        parallel: bool,
+
+        /// Número de workers para Rayon: auto o entero positivo.
+        #[arg(long, default_value = "auto")]
+        jobs: String,
     },
 
     /// Ejecuta una demostracion de atención softmax y atención regularizada por kernel.
@@ -98,6 +122,14 @@ pub enum Commands {
         /// Ruta opcional para exportar los resultados en CSV.
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Ejecuta queries independientes en paralelo si está disponible la feature parallel.
+        #[arg(long, default_value_t = false)]
+        parallel: bool,
+
+        /// Número de workers para Rayon: auto o entero positivo.
+        #[arg(long, default_value = "auto")]
+        jobs: String,
     },
 
     /// Ejecuta varias cabeceras de atención con distintos priors, gamma o temperatura.
@@ -109,6 +141,14 @@ pub enum Commands {
         /// Ruta opcional para exportar los resultados en CSV.
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Ejecuta queries/cabeceras independientes en paralelo si está disponible la feature parallel.
+        #[arg(long, default_value_t = false)]
+        parallel: bool,
+
+        /// Número de workers para Rayon: auto o entero positivo.
+        #[arg(long, default_value = "auto")]
+        jobs: String,
     },
 
     /// Ejecuta una suite reproducible y genera un paquete de evidencia CLI.
@@ -120,6 +160,14 @@ pub enum Commands {
         /// Directorio de salida para el paquete de evidencia.
         #[arg(long)]
         out: PathBuf,
+
+        /// Ejecuta pasos internos paralelizables si está disponible la feature parallel.
+        #[arg(long, default_value_t = false)]
+        parallel: bool,
+
+        /// Número de workers para Rayon: auto o entero positivo.
+        #[arg(long, default_value = "auto")]
+        jobs: String,
     },
 
     /// Ejecuta un barrido experimental sobre gamma, temperature y priors.
@@ -131,5 +179,13 @@ pub enum Commands {
         /// Ruta opcional para exportar los resultados en CSV.
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Ejecuta configuraciones independientes del sweep en paralelo si está disponible la feature parallel.
+        #[arg(long, default_value_t = false)]
+        parallel: bool,
+
+        /// Número de workers para Rayon: auto o entero positivo.
+        #[arg(long, default_value = "auto")]
+        jobs: String,
     },
 }

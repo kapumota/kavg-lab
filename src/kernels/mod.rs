@@ -24,7 +24,7 @@ pub struct KernelQuadraticForm {
 }
 
 /// Interfaz común para kernels convexos.
-pub trait KernelFunction {
+pub trait KernelFunction: Send + Sync {
     fn name(&self) -> &'static str;
     fn value(&self, x: &[f64]) -> f64;
     fn gradient(&self, x: &[f64]) -> Vec<f64>;

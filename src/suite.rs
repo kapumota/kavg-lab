@@ -1,4 +1,4 @@
-use crate::attention::{run_attention_demo, run_multihead_attention_demo};
+use crate::attention::{run_attention_demo_with_mode, run_multihead_attention_demo_with_mode};
 use crate::config::{
     AttentionConfig, AttentionSolverMethod, ExperimentConfig, MultiHeadAttentionConfig,
     SolverMethod,
@@ -12,7 +12,8 @@ use crate::io::csv_export::{
 use crate::kernels::build_kernel;
 use crate::optimization::averages::AverageKind;
 use crate::optimization::kernel_average::{solve_kernel_average, KernelAverageInput};
-use crate::optimization::solver_comparison::compare_solvers_for_points;
+use crate::optimization::solver_comparison::compare_solvers_for_points_with_mode;
+use crate::parallel::{self, ExecutionMode};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::fs;
@@ -77,6 +78,11 @@ struct SuiteStepReport {
 
 /// Ejecuta una suite reproducible y genera un paquete de evidencia.
 pub fn run_suite(suite_path: &Path, out_dir: &Path) -> Result<()> {
+    run_suite_with_mode(suite_path, out_dir, ExecutionMode::Sequential)
+}
+
+/// Ejecuta una suite reproducible con paralelismo opcional en pasos internos independientes.
+pub fn run_suite_with_mode(suite_path: &Path, out_dir: &Path, mode: ExecutionMode) -> Result<()> {
     let started_at = SystemTime::now();
     let suite_text = fs::read_to_string(suite_path)
         .with_context(|| format!("No se pudo leer la suite: {}", suite_path.display()))?;
@@ -103,11 +109,12 @@ pub fn run_suite(suite_path: &Path, out_dir: &Path) -> Result<()> {
         let output_path =
             resolve_output_path(out_dir, step.output.as_deref(), "compute_results.csv");
         commands.push(format!(
-            "kavg-lab compute --config {} --output {}",
+            "kavg-lab compute --config {} --output {}{}",
             config_path.display(),
-            output_path.display()
+            output_path.display(),
+            mode.cli_suffix()
         ));
-        let result_count = run_compute_step(&config_path, &output_path)?;
+        let result_count = run_compute_step(&config_path, &output_path, mode)?;
         reports.push(SuiteStepReport {
             name: "compute",
             config_path,
@@ -122,11 +129,12 @@ pub fn run_suite(suite_path: &Path, out_dir: &Path) -> Result<()> {
         let output_path =
             resolve_output_path(out_dir, step.output.as_deref(), "fenchel_results.csv");
         commands.push(format!(
-            "kavg-lab verify-fenchel --config {} --output {}",
+            "kavg-lab verify-fenchel --config {} --output {}{}",
             config_path.display(),
-            output_path.display()
+            output_path.display(),
+            mode.cli_suffix()
         ));
-        let result_count = run_fenchel_step(&config_path, &output_path)?;
+        let result_count = run_fenchel_step(&config_path, &output_path, mode)?;
         reports.push(SuiteStepReport {
             name: "verify-fenchel",
             config_path,
@@ -144,9 +152,14 @@ pub fn run_suite(suite_path: &Path, out_dir: &Path) -> Result<()> {
         if let Some(solver) = step.solver.as_ref() {
             command.push_str(&format!(" --solver {}", solver.as_str()));
         }
-        command.push_str(&format!(" --output {}", output_path.display()));
+        command.push_str(&format!(
+            " --output {}{}",
+            output_path.display(),
+            mode.cli_suffix()
+        ));
         commands.push(command);
-        let result_count = run_attention_step(&config_path, step.solver.clone(), &output_path)?;
+        let result_count =
+            run_attention_step(&config_path, step.solver.clone(), &output_path, mode)?;
         reports.push(SuiteStepReport {
             name: "attention-demo",
             config_path,
@@ -164,11 +177,12 @@ pub fn run_suite(suite_path: &Path, out_dir: &Path) -> Result<()> {
             "multihead_attention_results.csv",
         );
         commands.push(format!(
-            "kavg-lab multihead-attention-demo --config {} --output {}",
+            "kavg-lab multihead-attention-demo --config {} --output {}{}",
             config_path.display(),
-            output_path.display()
+            output_path.display(),
+            mode.cli_suffix()
         ));
-        let result_count = run_multihead_attention_step(&config_path, &output_path)?;
+        let result_count = run_multihead_attention_step(&config_path, &output_path, mode)?;
         reports.push(SuiteStepReport {
             name: "multihead-attention-demo",
             config_path,
@@ -189,12 +203,14 @@ pub fn run_suite(suite_path: &Path, out_dir: &Path) -> Result<()> {
             .collect::<Vec<_>>()
             .join(",");
         commands.push(format!(
-            "kavg-lab compare-solvers --config {} --solvers {} --output {}",
+            "kavg-lab compare-solvers --config {} --solvers {} --output {}{}",
             config_path.display(),
             solver_list,
-            output_path.display()
+            output_path.display(),
+            mode.cli_suffix()
         ));
-        let result_count = run_compare_solvers_step(&config_path, &step.solvers, &output_path)?;
+        let result_count =
+            run_compare_solvers_step(&config_path, &step.solvers, &output_path, mode)?;
         reports.push(SuiteStepReport {
             name: "compare-solvers",
             config_path,
@@ -241,14 +257,12 @@ fn validate_suite(suite: &SuiteConfig) -> Result<()> {
     Ok(())
 }
 
-fn run_compute_step(config_path: &Path, output_path: &Path) -> Result<usize> {
+fn run_compute_step(config_path: &Path, output_path: &Path, mode: ExecutionMode) -> Result<usize> {
     let experiment = ExperimentConfig::from_yaml_file(config_path)?;
     let f1 = build_function(&experiment.f1)?;
     let f2 = build_function(&experiment.f2)?;
     let kernel = build_kernel(&experiment.kernel)?;
-    let mut results = Vec::new();
-
-    for (index, point) in experiment.points.iter().enumerate() {
+    let results = parallel::map_indexed(&experiment.points, mode, |index, point| {
         let result = solve_kernel_average(KernelAverageInput {
             f1: f1.as_ref(),
             f2: f2.as_ref(),
@@ -258,24 +272,22 @@ fn run_compute_step(config_path: &Path, output_path: &Path) -> Result<usize> {
             solver: &experiment.solver,
             average_kind: AverageKind::Kernel,
         })?;
-        results.push(result.with_index_and_point(index, point.clone()));
-    }
+        Ok(result.with_index_and_point(index, point.clone()))
+    })?;
 
     export_results(output_path, &results)?;
     Ok(results.len())
 }
 
-fn run_fenchel_step(config_path: &Path, output_path: &Path) -> Result<usize> {
+fn run_fenchel_step(config_path: &Path, output_path: &Path, mode: ExecutionMode) -> Result<usize> {
     let experiment = ExperimentConfig::from_yaml_file(config_path)?;
     let f1 = build_function(&experiment.f1)?;
     let f2 = build_function(&experiment.f2)?;
     let f1_star = build_conjugate_function(&experiment.f1)?;
     let f2_star = build_conjugate_function(&experiment.f2)?;
     let kernel = build_kernel(&experiment.kernel)?;
-    let mut results = Vec::new();
-
-    for (index, dual_point) in experiment.points.iter().enumerate() {
-        let result = verify_fenchel_identity(FenchelIdentityInput {
+    let results = parallel::map_indexed(&experiment.points, mode, |index, dual_point| {
+        verify_fenchel_identity(FenchelIdentityInput {
             index,
             dual_point,
             f1: f1.as_ref(),
@@ -285,9 +297,8 @@ fn run_fenchel_step(config_path: &Path, output_path: &Path) -> Result<usize> {
             kernel: kernel.as_ref(),
             lambda1: experiment.lambda1,
             solver: &experiment.solver,
-        })?;
-        results.push(result);
-    }
+        })
+    })?;
 
     export_fenchel_checks(output_path, &results)?;
     Ok(results.len())
@@ -297,19 +308,24 @@ fn run_attention_step(
     config_path: &Path,
     solver_override: Option<AttentionSolverMethod>,
     output_path: &Path,
+    mode: ExecutionMode,
 ) -> Result<usize> {
     let mut config = AttentionConfig::from_yaml_file(config_path)?;
     if let Some(solver) = solver_override {
         config.attention_solver.method = Some(solver);
     }
-    let results = run_attention_demo(&config)?;
+    let results = run_attention_demo_with_mode(&config, mode)?;
     export_attention_results(output_path, &results)?;
     Ok(results.len())
 }
 
-fn run_multihead_attention_step(config_path: &Path, output_path: &Path) -> Result<usize> {
+fn run_multihead_attention_step(
+    config_path: &Path,
+    output_path: &Path,
+    mode: ExecutionMode,
+) -> Result<usize> {
     let config = MultiHeadAttentionConfig::from_yaml_file(config_path)?;
-    let results = run_multihead_attention_demo(&config)?;
+    let results = run_multihead_attention_demo_with_mode(&config, mode)?;
     export_multihead_results(output_path, &results)?;
     Ok(results.len())
 }
@@ -318,12 +334,13 @@ fn run_compare_solvers_step(
     config_path: &Path,
     solvers: &[SolverMethod],
     output_path: &Path,
+    mode: ExecutionMode,
 ) -> Result<usize> {
     let experiment = ExperimentConfig::from_yaml_file(config_path)?;
     let f1 = build_function(&experiment.f1)?;
     let f2 = build_function(&experiment.f2)?;
     let kernel = build_kernel(&experiment.kernel)?;
-    let results = compare_solvers_for_points(
+    let results = compare_solvers_for_points_with_mode(
         &experiment.points,
         f1.as_ref(),
         f2.as_ref(),
@@ -331,7 +348,8 @@ fn run_compare_solvers_step(
         experiment.lambda1,
         &experiment.solver,
         solvers,
-    );
+        mode,
+    )?;
     export_solver_comparison(output_path, &results)?;
     Ok(results.len())
 }

@@ -3,6 +3,7 @@ use crate::config::{
     AttentionSolverMethod, MaskEntry, MultiHeadAttentionConfig,
 };
 use crate::math::{dot, format_vector, norm2, sub};
+use crate::parallel::{self, ExecutionMode};
 use anyhow::{bail, Result};
 
 /// Resultado de atención para una consulta individual.
@@ -174,6 +175,14 @@ struct AttentionParams<'a> {
 
 /// Ejecuta la demo completa para todas las consultas del archivo YAML.
 pub fn run_attention_demo(config: &AttentionConfig) -> Result<Vec<AttentionResult>> {
+    run_attention_demo_with_mode(config, ExecutionMode::Sequential)
+}
+
+/// Ejecuta la demo de atención usando modo secuencial o paralelo sobre queries independientes.
+pub fn run_attention_demo_with_mode(
+    config: &AttentionConfig,
+    mode: ExecutionMode,
+) -> Result<Vec<AttentionResult>> {
     config.validate()?;
     let top_k = config.top_k.unwrap_or(config.keys.len().min(3));
     let params = AttentionParams {
@@ -185,95 +194,107 @@ pub fn run_attention_demo(config: &AttentionConfig) -> Result<Vec<AttentionResul
         top_k,
     };
 
-    let mut results = Vec::new();
-    for (index, query) in config.queries.iter().enumerate() {
-        results.push(run_single_attention(
-            index,
-            query,
-            &config.keys,
-            &config.values,
-            params,
-        )?);
-    }
-
-    Ok(results)
+    parallel::map_indexed(&config.queries, mode, |index, query| {
+        run_single_attention(index, query, &config.keys, &config.values, params)
+    })
 }
 
 /// Ejecuta una demo de multi-head attention con varias cabeceras configurables.
 pub fn run_multihead_attention_demo(
     config: &MultiHeadAttentionConfig,
 ) -> Result<Vec<MultiHeadAttentionResult>> {
+    run_multihead_attention_demo_with_mode(config, ExecutionMode::Sequential)
+}
+
+/// Ejecuta multi-head attention con paralelismo opcional sobre queries independientes.
+pub fn run_multihead_attention_demo_with_mode(
+    config: &MultiHeadAttentionConfig,
+    mode: ExecutionMode,
+) -> Result<Vec<MultiHeadAttentionResult>> {
     config.validate()?;
     let top_k = config.top_k.unwrap_or(config.keys.len().min(3));
-    let mut results = Vec::new();
 
-    for (query_index, query) in config.queries.iter().enumerate() {
-        let mut heads = Vec::new();
+    parallel::map_indexed(&config.queries, mode, |query_index, query| {
+        run_multihead_single_query(config, top_k, query_index, query)
+    })
+}
 
-        for (head_index, head) in config.heads.iter().enumerate() {
-            let solver = head
-                .attention_solver
-                .as_ref()
-                .unwrap_or(&config.default_attention_solver);
-            let mask = head.mask.as_ref().or(config.default_mask.as_ref());
-            let params = AttentionParams {
-                temperature: head.temperature,
-                kernel_gamma: head.kernel_gamma,
-                solver,
-                prior: head.prior.as_ref(),
-                mask,
-                top_k,
-            };
-            let single =
-                run_single_attention(query_index, query, &config.keys, &config.values, params)?;
-            let head_name = head
-                .name
-                .clone()
-                .unwrap_or_else(|| format!("head_{}", head_index));
+fn run_multihead_single_query(
+    config: &MultiHeadAttentionConfig,
+    top_k: usize,
+    query_index: usize,
+    query: &[f64],
+) -> Result<MultiHeadAttentionResult> {
+    let mut heads = Vec::new();
 
-            heads.push(HeadAttentionResult {
-                head_index,
-                head_name,
-                query_index,
-                temperature: head.temperature,
-                kernel_gamma: head.kernel_gamma,
-                prior: single.prior,
-                standard_weights: single.standard_weights,
-                regularized_weights: single.regularized_weights,
-                regularized_output: single.regularized_output,
-                entropy: single.regularized_entropy,
-                effective_tokens: single.effective_tokens_regularized,
-                top1_mass: single.regularized_top1_mass,
-                topk_mass: single.regularized_topk_mass,
-                iterations: single.iterations,
-                solver_metric: single.solver_metric,
-            });
-        }
+    for (head_index, head) in config.heads.iter().enumerate() {
+        let solver = head
+            .attention_solver
+            .as_ref()
+            .unwrap_or(&config.default_attention_solver);
+        let mask = head.mask.as_ref().or(config.default_mask.as_ref());
+        let params = AttentionParams {
+            temperature: head.temperature,
+            kernel_gamma: head.kernel_gamma,
+            solver,
+            prior: head.prior.as_ref(),
+            mask,
+            top_k,
+        };
+        let single =
+            run_single_attention(query_index, query, &config.keys, &config.values, params)?;
+        let head_name = head
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("head_{}", head_index));
 
-        let aggregated_output = average_outputs(&heads);
-        let average_entropy = heads.iter().map(|h| h.entropy).sum::<f64>() / heads.len() as f64;
-        let (mean_pairwise_l1, mean_pairwise_l2, mean_pairwise_js) = pairwise_head_metrics(&heads);
-
-        results.push(MultiHeadAttentionResult {
+        heads.push(HeadAttentionResult {
+            head_index,
+            head_name,
             query_index,
-            query: query.clone(),
-            aggregated_output,
-            average_entropy,
-            mean_pairwise_l1,
-            mean_pairwise_l2,
-            mean_pairwise_js,
-            heads,
+            temperature: head.temperature,
+            kernel_gamma: head.kernel_gamma,
+            prior: single.prior,
+            standard_weights: single.standard_weights,
+            regularized_weights: single.regularized_weights,
+            regularized_output: single.regularized_output,
+            entropy: single.regularized_entropy,
+            effective_tokens: single.effective_tokens_regularized,
+            top1_mass: single.regularized_top1_mass,
+            topk_mass: single.regularized_topk_mass,
+            iterations: single.iterations,
+            solver_metric: single.solver_metric,
         });
     }
 
-    Ok(results)
+    let aggregated_output = average_outputs(&heads);
+    let average_entropy = heads.iter().map(|h| h.entropy).sum::<f64>() / heads.len() as f64;
+    let (mean_pairwise_l1, mean_pairwise_l2, mean_pairwise_js) = pairwise_head_metrics(&heads);
+
+    Ok(MultiHeadAttentionResult {
+        query_index,
+        query: query.to_vec(),
+        aggregated_output,
+        average_entropy,
+        mean_pairwise_l1,
+        mean_pairwise_l2,
+        mean_pairwise_js,
+        heads,
+    })
 }
 
 /// Ejecuta un barrido experimental que prueba configuraciones de atención regularizada.
 pub fn run_agent_sweep(config: &AgentSweepConfig) -> Result<Vec<AgentSweepResult>> {
+    run_agent_sweep_with_mode(config, ExecutionMode::Sequential)
+}
+
+/// Ejecuta un barrido experimental con paralelismo opcional sobre configuraciones independientes.
+pub fn run_agent_sweep_with_mode(
+    config: &AgentSweepConfig,
+    mode: ExecutionMode,
+) -> Result<Vec<AgentSweepResult>> {
     config.validate()?;
 
-    let mut candidates = Vec::new();
     let priors: Vec<(String, Option<Vec<f64>>)> = match &config.priors {
         Some(named) => named
             .iter()
@@ -285,59 +306,65 @@ pub fn run_agent_sweep(config: &AgentSweepConfig) -> Result<Vec<AgentSweepResult
         )],
     };
 
+    let mut tasks = Vec::new();
     for gamma in &config.gamma_values {
         for temperature in &config.temperature_values {
             for (prior_name, prior) in &priors {
-                let mut candidate_config = config.base_attention.clone();
-                candidate_config.kernel_gamma = *gamma;
-                candidate_config.temperature = *temperature;
-                candidate_config.prior = prior.clone();
-
-                let results = run_attention_demo(&candidate_config)?;
-                let mean_regularized_entropy = mean(results.iter().map(|r| r.regularized_entropy));
-                let mean_distance_to_prior = mean(
-                    results
-                        .iter()
-                        .map(|r| l1_distance(&r.regularized_weights, &r.prior)),
-                );
-                let mean_difference_from_softmax =
-                    mean(results.iter().map(|r| r.weight_l1_distance));
-                let mean_output_shift = mean(results.iter().map(|r| r.output_l2_distance));
-                let mean_js_softmax_regularized =
-                    mean(results.iter().map(|r| r.js_softmax_regularized));
-                let mean_effective_tokens =
-                    mean(results.iter().map(|r| r.effective_tokens_regularized));
-                let score = score_candidate(
-                    &config.objective,
-                    mean_regularized_entropy,
-                    mean_distance_to_prior,
-                    mean_difference_from_softmax,
-                    mean_output_shift,
-                    mean_js_softmax_regularized,
-                );
-
-                candidates.push(AgentSweepResult {
-                    rank: 0,
-                    gamma: *gamma,
-                    temperature: *temperature,
-                    prior_name: prior_name.clone(),
-                    objective: config.objective.as_str().to_string(),
-                    score,
-                    mean_regularized_entropy,
-                    mean_distance_to_prior,
-                    mean_difference_from_softmax,
-                    mean_output_shift,
-                    mean_js_softmax_regularized,
-                    mean_effective_tokens,
-                });
+                tasks.push((*gamma, *temperature, prior_name.clone(), prior.clone()));
             }
         }
     }
+
+    let mut candidates = parallel::map_indexed(&tasks, mode, |_index, task| {
+        let (gamma, temperature, prior_name, prior) = task;
+        let mut candidate_config = config.base_attention.clone();
+        candidate_config.kernel_gamma = *gamma;
+        candidate_config.temperature = *temperature;
+        candidate_config.prior = prior.clone();
+
+        let results = run_attention_demo(&candidate_config)?;
+        let mean_regularized_entropy = mean(results.iter().map(|r| r.regularized_entropy));
+        let mean_distance_to_prior = mean(
+            results
+                .iter()
+                .map(|r| l1_distance(&r.regularized_weights, &r.prior)),
+        );
+        let mean_difference_from_softmax = mean(results.iter().map(|r| r.weight_l1_distance));
+        let mean_output_shift = mean(results.iter().map(|r| r.output_l2_distance));
+        let mean_js_softmax_regularized = mean(results.iter().map(|r| r.js_softmax_regularized));
+        let mean_effective_tokens = mean(results.iter().map(|r| r.effective_tokens_regularized));
+        let score = score_candidate(
+            &config.objective,
+            mean_regularized_entropy,
+            mean_distance_to_prior,
+            mean_difference_from_softmax,
+            mean_output_shift,
+            mean_js_softmax_regularized,
+        );
+
+        Ok(AgentSweepResult {
+            rank: 0,
+            gamma: *gamma,
+            temperature: *temperature,
+            prior_name: prior_name.clone(),
+            objective: config.objective.as_str().to_string(),
+            score,
+            mean_regularized_entropy,
+            mean_distance_to_prior,
+            mean_difference_from_softmax,
+            mean_output_shift,
+            mean_js_softmax_regularized,
+            mean_effective_tokens,
+        })
+    })?;
 
     candidates.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.prior_name.cmp(&b.prior_name))
+            .then_with(|| a.gamma.total_cmp(&b.gamma))
+            .then_with(|| a.temperature.total_cmp(&b.temperature))
     });
     let limit = config
         .output_limit

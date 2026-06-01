@@ -7,6 +7,7 @@ use kavg_lab::functions::{build_conjugate_function, build_function, ConvexFuncti
 use kavg_lab::kernels::build_kernel;
 use kavg_lab::optimization::averages::AverageKind;
 use kavg_lab::optimization::kernel_average::{solve_kernel_average, KernelAverageInput};
+use kavg_lab::parallel::{parse_execution_mode, ExecutionMode};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -420,4 +421,57 @@ points:
     assert_eq!(f2.name(), "indicator-box");
     assert!(f2.value(&[0.0, 0.5, -0.5]).is_finite());
     assert!(f2.value(&[1.2, 0.0, 0.0]).is_infinite());
+}
+
+#[test]
+fn phase5_sequential_mode_parses_without_parallel_feature() {
+    assert_eq!(
+        parse_execution_mode(false, "auto").expect("modo secuencial debe parsear"),
+        ExecutionMode::Sequential
+    );
+    assert_eq!(
+        parse_execution_mode(false, "8").expect("--jobs sin --parallel no debe romper"),
+        ExecutionMode::Sequential
+    );
+}
+
+#[test]
+fn phase5_parallel_mode_reports_missing_feature_when_disabled() {
+    if !cfg!(feature = "parallel") {
+        let error = parse_execution_mode(true, "auto")
+            .expect_err("--parallel debe requerir feature parallel");
+        let message = format!("{error:#}");
+        assert!(
+            message.contains("feature `parallel`"),
+            "mensaje inesperado: {message}"
+        );
+    }
+}
+
+#[cfg(feature = "parallel")]
+#[test]
+fn phase5_parallel_attention_matches_sequential_attention() {
+    let config = AttentionConfig::from_yaml_file(&example("attention_demo.yaml"))
+        .expect("attention_demo.yaml debe parsear");
+    let sequential =
+        kavg_lab::attention::run_attention_demo(&config).expect("modo secuencial debe ejecutarse");
+    let mode = parse_execution_mode(true, "auto").expect("modo paralelo debe parsear");
+    let parallel = kavg_lab::attention::run_attention_demo_with_mode(&config, mode)
+        .expect("modo paralelo debe ejecutarse");
+
+    assert_eq!(sequential.len(), parallel.len());
+    for (left, right) in sequential.iter().zip(parallel.iter()) {
+        assert_eq!(left.index, right.index);
+        assert_eq!(
+            left.regularized_weights.len(),
+            right.regularized_weights.len()
+        );
+        for (a, b) in left
+            .regularized_weights
+            .iter()
+            .zip(&right.regularized_weights)
+        {
+            assert!((a - b).abs() < 1.0e-10);
+        }
+    }
 }
