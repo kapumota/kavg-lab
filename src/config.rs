@@ -77,6 +77,11 @@ pub enum KernelConfig {
         matrix: Vec<Vec<f64>>,
         center: Option<Vec<f64>>,
     },
+    #[serde(rename = "bregman-entropy")]
+    BregmanEntropy {
+        reference: Option<Vec<f64>>,
+        epsilon: Option<f64>,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -379,6 +384,25 @@ impl ExperimentConfig {
                         center.len() == self.dimension,
                         "kernel.bregman-quadratic.center debe tener dimensión {}.",
                         self.dimension
+                    );
+                }
+            }
+            KernelConfig::BregmanEntropy { reference, epsilon } => {
+                if let Some(reference) = reference {
+                    anyhow::ensure!(
+                        reference.len() == self.dimension,
+                        "kernel.bregman-entropy.reference debe tener dimensión {}.",
+                        self.dimension
+                    );
+                    anyhow::ensure!(
+                        reference.iter().all(|v| *v > 0.0),
+                        "kernel.bregman-entropy.reference debe contener valores positivos."
+                    );
+                }
+                if let Some(epsilon) = epsilon {
+                    anyhow::ensure!(
+                        *epsilon > 0.0,
+                        "kernel.bregman-entropy.epsilon debe ser positivo."
                     );
                 }
             }

@@ -1,4 +1,4 @@
-### KAvgLab 
+### KAvgLab
 
 KAvgLab es un CLI  desarrollado en Rust para experimentar con promedios kernel de funciones convexas, verificación numérica de identidades de Fenchel, comparación de promedios convexos y demostraciones de atención inspiradas en arquitecturas modernas de inteligencia artificial.
 
@@ -10,7 +10,7 @@ Desde el punto de vista de ingeniería, el proyecto separa claramente la configu
 
 La versión actual también conecta el análisis convexo con inteligencia artificial. En particular, implementa una demostración de atención regularizada donde la distribución de atención no depende solo de los scores, sino también de una penalización hacia una distribución previa. Esta idea permite interpretar la atención como un problema de optimización regularizada, lo cual abre una conexión natural con Transformers, LLMs, MLLMs y sistemas de agentes.
 
-En el contexto de Transformers, el software permite comparar la atención softmax estándar con una atención regularizada por kernel. En el contexto de LLMs, incorpora máscaras causales que impiden atender a posiciones futuras, imitando el principio de atención autoregresiva. 
+En el contexto de Transformers, el software permite comparar la atención softmax estándar con una atención regularizada por kernel. En el contexto de LLMs, incorpora máscaras causales que impiden atender a posiciones futuras, imitando el principio de atención autoregresiva.
 
 En el contexto de MLLMs, incluye una demostración de cross-attention multimodal sintética, donde consultas de texto pueden atender a claves y valores asociados a regiones visuales simuladas. Finalmente, en el contexto de agentes, incluye un barrido experimental que prueba combinaciones de hiperparámetros y ordena los resultados según objetivos definidos.
 
@@ -860,7 +860,7 @@ El agente experimental ordena configuraciones según el objetivo balanced-tradeo
 ```
 
 
-> La principal contribución del MVP es tender un puente entre teoría convexa y mecanismos de inteligencia artificial. La atención regularizada 
+> La principal contribución del MVP es tender un puente entre teoría convexa y mecanismos de inteligencia artificial. La atención regularizada
 > implementada en el software permite reinterpretar una parte central de los Transformers como un problema de optimización: los pesos de atención no se calculan únicamente a partir de compatibilidades entre vectores, sino que también pueden incorporar priors, restricciones, máscaras y regularización.
 
 Esta perspectiva es relevante porque muchos sistemas modernos de IA combinan aprendizaje estadístico con restricciones estructurales. En LLMs, las máscaras causales imponen una estructura temporal, en MLLMs, la cross-attention conecta modalidades distintas y en agentes, la selección de configuraciones puede verse como un proceso de búsqueda guiada por métricas. KAvgLab no pretende reemplazar frameworks de deep learning, sino ofrecer un entorno pequeño, transparente y matemáticamente interpretable para estudiar estas ideas desde la optimización convexa.
@@ -1162,3 +1162,55 @@ cargo run -- attention-demo \
 ```
 
 La fase también agrega `src/optimization/projections.rs` con operadores de proyección para simplex, top-k simplex y una proyección de Dykstra básica para intersecar caja y simplex.
+
+## Fase 7: matemática convexa auditable
+
+La Fase 7 agrega comandos pequeños para verificar propiedades matemáticas y calcular operadores fundamentales de optimización convexa. El objetivo es hacer que KAvgLab sea más auditable sin dejar de ser un CLI.
+
+### Operadores proximales
+
+```bash
+cargo run -- prox \
+  --function examples/functions/l1.yaml \
+  --point "[1.0,-2.0,0.5]" \
+  --step 0.1 \
+  --moreau
+```
+
+Casos soportados inicialmente:
+
+- `l1`: soft-thresholding.
+- `l2`: shrinkage.
+- `elastic-net`: soft-thresholding con contracción L2.
+- `indicator-box`: proyección a caja.
+- `indicator-simplex`: proyección al simplex.
+
+### Fenchel-Young
+
+```bash
+cargo run -- fenchel-young \
+  --function examples/functions/l1.yaml \
+  --x "[1.0,-2.0,0.5]" \
+  --s "[0.2,-0.1,0.3]"
+```
+
+El comando reporta:
+
+- `f(x)`
+- `f*(s)`
+- `<x,s>`
+- `gap = f(x)+f*(s)-<x,s>`
+- `relative_gap`
+- `passed`
+
+### Geometría Bregman entrópica
+
+Además de los kernels anteriores, se agrega `bregman-entropy` como divergencia de Bregman inducida por entropía negativa. Esta geometría conecta con KL, mirror descent y atención regularizada sobre simplex.
+
+```yaml
+kernel:
+  type: bregman-entropy
+  reference: [1.0, 1.0, 1.0]
+  epsilon: 1.0e-12
+```
+

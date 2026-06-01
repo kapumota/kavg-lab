@@ -1,3 +1,4 @@
+mod bregman_entropy;
 mod bregman_quadratic;
 mod entropy_kl;
 mod huber;
@@ -7,6 +8,7 @@ mod weighted_squared_norm;
 
 use crate::config::KernelConfig;
 use anyhow::Result;
+pub use bregman_entropy::BregmanEntropyKernel;
 pub use bregman_quadratic::BregmanQuadraticKernel;
 pub use entropy_kl::EntropyKlKernel;
 pub use huber::HuberKernel;
@@ -33,7 +35,6 @@ pub trait KernelFunction: Send + Sync {
         None
     }
 }
-
 pub fn build_kernel(config: &KernelConfig) -> Result<Box<dyn KernelFunction>> {
     match config {
         KernelConfig::SquaredNorm => Ok(Box::new(SquaredNormKernel)),
@@ -49,6 +50,9 @@ pub fn build_kernel(config: &KernelConfig) -> Result<Box<dyn KernelFunction>> {
         }
         KernelConfig::BregmanQuadratic { matrix, center } => Ok(Box::new(
             BregmanQuadraticKernel::new(matrix.clone(), center.clone())?,
+        )),
+        KernelConfig::BregmanEntropy { reference, epsilon } => Ok(Box::new(
+            BregmanEntropyKernel::new(reference.clone(), *epsilon)?,
         )),
     }
 }

@@ -25,6 +25,7 @@ use kavg_lab::optimization::comparison::compare_averages;
 use kavg_lab::optimization::kernel_average::{solve_kernel_average, KernelAverageInput};
 use kavg_lab::optimization::solver_comparison::compare_solvers_for_points_with_mode;
 use kavg_lab::parallel::{parse_execution_mode, ExecutionMode};
+use kavg_lab::prox::{check_fenchel_young, compute_prox, load_function_config, parse_vector};
 use kavg_lab::suite::run_suite_with_mode;
 use std::time::SystemTime;
 
@@ -46,6 +47,18 @@ fn main() -> Result<()> {
             manifest,
             parse_execution_mode(parallel, &jobs)?,
         )?,
+        Commands::Prox {
+            function,
+            point,
+            step,
+            moreau,
+        } => run_prox(&function, &point, step, moreau)?,
+        Commands::FenchelYoung {
+            function,
+            x,
+            s,
+            tolerance,
+        } => run_fenchel_young(&function, &x, &s, tolerance)?,
         Commands::Compare { config, output } => run_compare(&config, output)?,
         Commands::CompareSolvers {
             config,
@@ -105,6 +118,53 @@ fn main() -> Result<()> {
         } => run_agent_sweep_command(&config, output, parse_execution_mode(parallel, &jobs)?)?,
     }
 
+    Ok(())
+}
+
+fn run_prox(
+    function_path: &std::path::Path,
+    point_text: &str,
+    step: f64,
+    show_moreau: bool,
+) -> Result<()> {
+    let config = load_function_config(function_path)?;
+    let point = parse_vector(point_text)?;
+    let result = compute_prox(&config, &point, step)?;
+
+    println!("Experimento KAvgLab - Operador proximal");
+    println!("función: {}", result.function_name);
+    println!("step: {:.10}", result.step);
+    println!("x: {:?}", result.point);
+    println!("prox: {:?}", result.prox);
+    println!("f(prox): {:.10}", result.function_value_at_prox);
+    if show_moreau {
+        println!("moreau_value: {:.10}", result.moreau_value);
+        println!("gradient_moreau: {:?}", result.moreau_gradient);
+    }
+    Ok(())
+}
+
+fn run_fenchel_young(
+    function_path: &std::path::Path,
+    x_text: &str,
+    s_text: &str,
+    tolerance: f64,
+) -> Result<()> {
+    let config = load_function_config(function_path)?;
+    let x = parse_vector(x_text)?;
+    let s = parse_vector(s_text)?;
+    let result = check_fenchel_young(&config, &x, &s, tolerance)?;
+
+    println!("Experimento KAvgLab - Fenchel-Young");
+    println!("función: {}", result.function_name);
+    println!("x: {:?}", result.x);
+    println!("s: {:?}", result.s);
+    println!("f(x): {:.10}", result.f_value);
+    println!("f*(s): {:.10}", result.conjugate_value);
+    println!("<x,s>: {:.10}", result.pairing);
+    println!("gap: {:.10}", result.gap);
+    println!("relative_gap: {:.6e}", result.relative_gap);
+    println!("passed: {}", result.passed);
     Ok(())
 }
 

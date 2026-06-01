@@ -12,4 +12,5 @@ pub mod kernels;
 pub mod math;
 pub mod optimization;
 pub mod parallel;
+pub mod prox;
 pub mod suite;
