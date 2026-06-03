@@ -1,72 +1,151 @@
 ### KAvgLab
 
-KAvgLab es un CLI  desarrollado en Rust para experimentar con promedios kernel de funciones convexas, verificación numérica de identidades de Fenchel, comparación de promedios convexos y demostraciones de atención inspiradas en arquitecturas modernas de inteligencia artificial.
+KAvgLab es un CLI desarrollado en Rust para experimentar con promedios kernel de funciones convexas, verificación numérica de identidades de Fenchel, comparación de promedios convexos, operadores proximales, solvers de optimización y demostraciones de atención inspiradas en Transformers, LLMs, MLLMs y sistemas de agentes.
 
-El fundamento matemático principal del proyecto proviene del artículo **[The kernel average for two convex functions and its application to the extension and representation of monotone operators](https://optimization-online.org/wp-content/uploads/2007/05/1658.pdf)**, de **Heinz H. Bauschke y Xianfu Wang**. En este trabajo, los autores proponen una forma general de combinar dos funciones convexas mediante una función kernel. Esta construcción permite recuperar, como casos particulares, promedios conocidos en análisis convexo, como el promedio aritmético, el promedio epigráfico y el promedio proximal.
+El fundamento matemático principal proviene del trabajo **[The kernel average for two convex functions and its application to the extension and representation of monotone operators](https://optimization-online.org/wp-content/uploads/2007/05/1658.pdf)**, de Heinz H. Bauschke y Xianfu Wang. La idea central es combinar funciones convexas mediante una función kernel, lo que permite recuperar y comparar promedios como el promedio aritmético, el promedio epigráfico y el promedio proximal.
 
-El objetivo de KAvgLab no es implementar únicamente una fórmula matemática, sino convertir esa idea en una herramienta computacional reproducible. El software permite definir funciones convexas simples, seleccionar un kernel, evaluar puntos de prueba, comparar diferentes tipos de promedios y exportar resultados en CSV para análisis posterior. Además, incorpora una verificación numérica de la relación entre el promedio kernel y la conjugación de Fenchel, lo que permite estudiar de forma experimental la correspondencia entre el problema primal y su contraparte dual.
+El objetivo del proyecto no es implementar un Transformer completo ni entrenar un LLM. Su objetivo es construir un laboratorio CLI, reproducible y auditable para estudiar cómo ideas de análisis convexo, regularización, dualidad de Fenchel, geometría del simplex y atención regularizada pueden conectarse con mecanismos modernos de inteligencia artificial.
 
-Desde el punto de vista de ingeniería, el proyecto separa claramente la configuración, las funciones convexas, los kernels, los solvers, la verificación de Fenchel, la exportación de resultados y las demostración de atención. Esta separación facilita que el software sea inspeccionable, extensible.
+#### Estado actual del proyecto
 
-La versión actual también conecta el análisis convexo con inteligencia artificial. En particular, implementa una demostración de atención regularizada donde la distribución de atención no depende solo de los scores, sino también de una penalización hacia una distribución previa. Esta idea permite interpretar la atención como un problema de optimización regularizada, lo cual abre una conexión natural con Transformers, LLMs, MLLMs y sistemas de agentes.
+La versión actual del paquete en `Cargo.toml` es:
 
-En el contexto de Transformers, el software permite comparar la atención softmax estándar con una atención regularizada por kernel. En el contexto de LLMs, incorpora máscaras causales que impiden atender a posiciones futuras, imitando el principio de atención autoregresiva.
+```text
+kavg-lab 0.12.0
+```
 
-En el contexto de MLLMs, incluye una demostración de cross-attention multimodal sintética, donde consultas de texto pueden atender a claves y valores asociados a regiones visuales simuladas. Finalmente, en el contexto de agentes, incluye un barrido experimental que prueba combinaciones de hiperparámetros y ordena los resultados según objetivos definidos.
+El proyecto ya incluye:
 
-KAvgLab debe entenderse como un prototipo mayor: no implementa un Transformer completo ni entrena un LLM, pero sí proporciona una base matemática y computacional para estudiar cómo ideas de análisis convexo, regularización y promedios kernel pueden relacionarse con mecanismos modernos de atención.
+- CLI en Rust con `clap`.
+- Configuración de experimentos mediante YAML.
+- Exportación de resultados a CSV.
+- Exportación opcional a JSON y manifiesto reproducible para `compute`.
+- Funciones convexas, kernels y solvers configurables.
+- Demos de atención regularizada, multi-head attention, cross-attention sintética y agent sweep.
+- Operadores proximales y verificación Fenchel-Young.
+- Suites reproducibles desde CLI.
+- Paralelismo determinista opcional con la feature `parallel`.
+- Pruebas unitarias, pruebas de integración, property-based testing y benchmarks.
+- CI en GitHub Actions para formato, compilación, Clippy, pruebas, build release, feature `parallel` y compilación de benchmarks.
 
-
-Convención del proyecto:
+#### Convenciones del proyecto
 
 - Comentarios, README y mensajes de consola en español.
 - Funciones, structs, enums, módulos y métodos en inglés.
-- Resultados exportables en CSV para análisis y presentación.
+- Archivos de configuración en YAML.
+- Resultados exportables en CSV para análisis tabular.
+- Resultados JSON y manifiestos cuando se requiere auditoría.
+- `Cargo.lock` se versiona porque el proyecto es una aplicación CLI y se busca reproducibilidad.
+- Los artefactos generados no deben subirse por defecto al repositorio.
 
+#### Qué hace el software
 
+El binario `kavg-lab` expone los siguientes comandos reales:
 
-#### 1. Qué hace el software
-
-El binario `kavg-lab` permite ejecutar seis flujos principales:
-
-| Comando | Qué hace | Relación conceptual |
+| Comando | Propósito | Relación conceptual |
 |---|---|---|
-| `compute` | Calcula un kernel average en puntos definidos por YAML | Análisis convexo / optimización |
+| `compute` | Calcula el kernel average en puntos definidos por YAML | Análisis convexo y optimización |
 | `compare` | Compara promedio aritmético, epigráfico y proximal/kernel average | Comparación de promedios convexos |
-| `verify-fenchel` | Verifica numéricamente una identidad de Fenchel | Dualidad convexa |
-| `attention-demo` | Compara softmax attention vs atención regularizada por kernel | Transformers |
-| `multihead-attention-demo` | Ejecuta varias cabeceras de atención con priors distintos | Multi-head attention |
-| `agent-sweep` | Prueba hiperparámetros y rankea configuraciones | Agente experimental reproducible |
+| `verify-fenchel` | Verifica numéricamente una identidad de Fenchel para kernel averages | Dualidad convexa |
+| `compare-solvers` | Compara varios solvers sobre el mismo experimento | Evaluación algorítmica |
+| `prox` | Calcula operadores proximales y, opcionalmente, la envolvente de Moreau | Optimización proximal |
+| `fenchel-young` | Verifica la desigualdad de Fenchel-Young | Auditoría matemática local |
+| `attention-demo` | Compara atención softmax y atención regularizada por kernel | Transformers y atención regularizada |
+| `multihead-attention-demo` | Ejecuta varias cabeceras con priors y parámetros distintos | Multi-head attention |
+| `agent-sweep` | Barre hiperparámetros y rankea configuraciones | Agente experimental reproducible |
+| `run-suite` | Ejecuta una suite YAML y genera un paquete de evidencia | Reproducibilidad experimental |
+| `profile` | Perfila `agent-sweep` y exporta estadísticas de tiempo | Benchmarking CLI |
 
+#### Estructura del repositorio
 
-#### 2. Instalación de Rust en Linux Ubuntu
+La organización principal del proyecto es:
 
-Rust se instala con `rustup`, que incluye `rustc`, `cargo`, `rustfmt` y herramientas del ecosistema.
+```text
+kavg-lab/
+├── .github/workflows/ci.yml
+├── benches/
+│   ├── attention_bench.rs
+│   ├── kernel_average_bench.rs
+│   ├── simplex_projection_bench.rs
+│   └── sweep_bench.rs
+├── docs/
+│   ├── fase-1-profesionalizacion-cli.md
+│   ├── fase-2-matematica-convexa.md
+│   ├── fase-3-solvers-algoritmos.md
+│   └── fase-4-experimentacion-cli-reproducible.md
+├── examples/
+│   ├── functions/
+│   ├── attention_demo.yaml
+│   ├── attention_causal.yaml
+│   ├── attention_custom_mask.yaml
+│   ├── attention_sweep.yaml
+│   ├── compare_quadratic_l1.yaml
+│   ├── cross_attention_multimodal.yaml
+│   ├── fase2_*.yaml
+│   ├── fase3_*.yaml
+│   ├── fase6_*.yaml
+│   ├── fenchel_quadratic_l2.yaml
+│   ├── multihead_attention.yaml
+│   └── quadratic_l1.yaml
+├── experiments/
+│   ├── README.md
+│   └── suite.yaml
+├── sample_outputs/
+│   └── README.md
+├── src/
+│   ├── attention/
+│   ├── fenchel/
+│   ├── functions/
+│   ├── io/
+│   ├── kernels/
+│   ├── optimization/
+│   ├── prox/
+│   ├── cli.rs
+│   ├── config.rs
+│   ├── lib.rs
+│   ├── main.rs
+│   ├── math.rs
+│   ├── parallel.rs
+│   ├── profile.rs
+│   └── suite.rs
+├── tests/
+│   ├── integration_tests.rs
+│   ├── property_attention.rs
+│   ├── property_kernels.rs
+│   ├── property_solvers.rs
+│   └── regression_examples.rs
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── Cargo.lock
+├── Cargo.toml
+├── LICENSE
+├── README.md
+├── SECURITY.md
+└── rust-toolchain.toml
+```
 
-##### 2.1 Instalar dependencias básicas
+#### Instalación de Rust en Linux, macOS o WSL
+
+Instalar dependencias básicas:
 
 ```bash
 sudo apt update
 sudo apt install -y curl build-essential pkg-config
 ```
 
-##### 2.2 Instalar Rust con rustup
+Instalar Rust con `rustup`:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Durante la instalación, elegir la opción por defecto.
-
-##### 2.3 Activar Cargo en la terminal actual
+Activar Cargo en la terminal actual:
 
 ```bash
 source "$HOME/.cargo/env"
 ```
 
-Si no funciona, cerrar y abrir la terminal.
-
-##### 2.4 Verificar instalación
+Verificar la instalación:
 
 ```bash
 rustc --version
@@ -74,19 +153,11 @@ cargo --version
 rustup --version
 ```
 
+#### Instalación de Rust en Windows
 
-#### 3. Instalación de Rust en Windows
+Instalar Rust usando `rustup-init.exe` desde la página oficial de Rust. Durante la instalación, aceptar la configuración por defecto. Si el instalador lo solicita, instalar **Visual Studio C++ Build Tools**.
 
-##### 3.1 Instalar con rustup-init
-
-1. Descargar `rustup-init.exe` desde la página oficial de Rust.
-2. Ejecutar el instalador.
-3. Aceptar la instalación por defecto.
-4. Si el instalador lo solicita, instalar **Visual Studio C++ Build Tools**.
-
-##### 3.2 Verificar en PowerShell
-
-Abrir una nueva ventana de PowerShell y ejecutar:
+Abrir una nueva terminal de PowerShell y verificar:
 
 ```powershell
 rustc --version
@@ -94,153 +165,533 @@ cargo --version
 rustup --version
 ```
 
-Si `cargo` no se reconoce, cerrar y volver a abrir PowerShell. Rust instala las herramientas normalmente en:
+Si `cargo` no se reconoce, cerrar y volver a abrir PowerShell. Normalmente Rust instala las herramientas en:
 
 ```text
 %USERPROFILE%\.cargo\bin
 ```
 
+#### Abrir el proyecto
 
-#### 4. Abrir el proyecto
-
-##### Linux, macOS o WSL
+En Linux, macOS o WSL:
 
 ```bash
 cd kavg-lab
-```
-
-### Windows PowerShell
-
-```powershell
-cd .\kavg-lab
-```
-
-Verificar que exista el archivo principal de Cargo:
-
-```bash
 ls Cargo.toml
-```
-
-En PowerShell:
-
-```powershell
-dir Cargo.toml
-```
-
-
-#### 5. Cargo.lock para reproducibilidad
-
-Para una aplicación CLI, conviene versionar `Cargo.lock`, porque fija las versiones exactas de dependencias transitivas usadas por Cargo.
-
-##### 5.1 Quitar `Cargo.lock` de `.gitignore`
-
-En Linux, macOS, WSL o Git Bash:
-
-```bash
-sed -i '/^Cargo.lock$/d' .gitignore
 ```
 
 En Windows PowerShell:
 
 ```powershell
-(Get-Content .gitignore) | Where-Object { $_ -ne "Cargo.lock" } | Set-Content .gitignore
+cd .\kavg-lab
+dir Cargo.toml
 ```
 
-##### 5.2 Generar Cargo.lock
+#### Validación local obligatoria
 
-```bash
-cargo generate-lockfile
-```
-
-##### 5.3 Verificar que existe
-
-```bash
-ls Cargo.lock
-```
-
-En PowerShell:
-
-```powershell
-dir Cargo.lock
-```
-
-##### 5.4 Modo recomendado para Git
-
-```bash
-git add Cargo.lock .gitignore
-git commit -m "Agregar Cargo.lock para builds reproducibles"
-```
-
-
-#### 6. Validación obligatoria antes de presentar
-
-Ejecutar desde la raíz del proyecto:
-
-```bash
-cargo fmt
-cargo check
-cargo test
-cargo clippy -- -D warnings
-```
-
-También es recomendable generar el binario optimizado:
-
-```bash
-cargo build --release
-```
-
-Si todo pasa sin errores, el proyecto está listo para una presentación técnica.
-
-Comando alternativo para verificar formato sin modificar archivos:
+Antes de presentar, abrir un Pull Request o fusionar a `main`, ejecutar desde la raíz del proyecto:
 
 ```bash
 cargo fmt -- --check
+cargo check --all-targets
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+cargo build --release
 ```
 
-#### 7. Ecuación del kernel average paso a paso
+Validación con paralelismo opcional:
+
+```bash
+cargo check --all-targets --features parallel
+cargo clippy --all-targets --features parallel -- -D warnings
+cargo test --all-targets --features parallel
+cargo build --release --features parallel
+```
+
+Compilación de benchmarks:
+
+```bash
+cargo bench --no-run
+```
+
+#### CI en GitHub Actions
+
+El workflow `.github/workflows/ci.yml` ejecuta validaciones sobre `main` y sobre Pull Requests:
+
+```text
+cargo fmt -- --check
+cargo check --all-targets
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets
+cargo build --release
+cargo check --all-targets --features parallel
+cargo clippy --all-targets --features parallel -- -D warnings
+cargo test --all-targets --features parallel
+cargo build --release --features parallel
+cargo bench --no-run
+```
+
+Esto permite demostrar que el proyecto compila, mantiene formato, pasa pruebas, respeta Clippy y soporta la feature opcional `parallel`.
+
+#### Uso rápido
+
+Ver ayuda general:
+
+```bash
+cargo run -- --help
+```
+
+Ver ayuda de subcomandos:
+
+```bash
+cargo run -- compute --help
+cargo run -- compare --help
+cargo run -- verify-fenchel --help
+cargo run -- compare-solvers --help
+cargo run -- prox --help
+cargo run -- fenchel-young --help
+cargo run -- attention-demo --help
+cargo run -- multihead-attention-demo --help
+cargo run -- agent-sweep --help
+cargo run -- run-suite --help
+cargo run -- profile --help
+```
+
+#### Análisis convexo básico
+
+Calcular un kernel average:
+
+```bash
+cargo run -- compute \
+  --config examples/quadratic_l1.yaml \
+  --output sample_outputs/results.csv \
+  --json sample_outputs/results.json \
+  --manifest sample_outputs/manifest.json
+```
+
+Comparar promedios convexos:
+
+```bash
+cargo run -- compare \
+  --config examples/compare_quadratic_l1.yaml \
+  --output sample_outputs/comparison.csv
+```
+
+Verificar identidad de Fenchel:
+
+```bash
+cargo run -- verify-fenchel \
+  --config examples/fenchel_quadratic_l2.yaml \
+  --output sample_outputs/fenchel.csv
+```
+
+#### Uso con OSQP
+
+OSQP se usa como backend alternativo cuando el problema puede expresarse como QP.
+
+```bash
+cargo run -- compute \
+  --config examples/quadratic_l1_osqp.yaml \
+  --output sample_outputs/results_osqp.csv
+```
+
+```bash
+cargo run -- compare \
+  --config examples/compare_quadratic_l1_osqp.yaml \
+  --output sample_outputs/comparison_osqp.csv
+```
+
+```bash
+cargo run -- verify-fenchel \
+  --config examples/fenchel_quadratic_l2_osqp.yaml \
+  --output sample_outputs/fenchel_osqp.csv
+```
+
+#### Operadores proximales y Fenchel-Young
+
+Calcular un operador proximal:
+
+```bash
+cargo run -- prox \
+  --function examples/functions/l1.yaml \
+  --point "[1.0,-2.0,0.5]" \
+  --step 0.1 \
+  --moreau
+```
+
+Verificar Fenchel-Young:
+
+```bash
+cargo run -- fenchel-young \
+  --function examples/functions/l1.yaml \
+  --x "[1.0,-2.0,0.5]" \
+  --s "[0.2,-0.1,0.3]"
+```
+
+El comando reporta:
+
+```text
+f(x)
+f*(s)
+<x,s>
+gap = f(x) + f*(s) - <x,s>
+relative_gap
+passed
+```
+
+#### Comparación de solvers
+
+Comparar varios métodos sobre los mismos puntos:
+
+```bash
+cargo run -- compare-solvers \
+  --config examples/fase3_compare_solvers.yaml \
+  --solvers coordinate-descent,subgradient,osqp,proximal-gradient,fista,admm \
+  --output sample_outputs/solver_comparison.csv
+```
+
+Solvers convexos soportados:
+
+```text
+coordinate-descent
+subgradient
+osqp
+proximal-gradient
+fista
+admm
+```
+
+#### Atención regularizada
+
+Ejecutar demo base de atención:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/attention_demo.yaml \
+  --output sample_outputs/attention_results.csv
+```
+
+Ejecutar atención con prior uniforme:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/attention_demo_uniform.yaml \
+  --output sample_outputs/attention_uniform.csv
+```
+
+Ejecutar atención causal tipo LLM autoregresivo:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/attention_causal.yaml \
+  --output sample_outputs/attention_causal.csv
+```
+
+Ejecutar atención con máscara personalizada:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/attention_custom_mask.yaml \
+  --output sample_outputs/attention_custom_mask.csv
+```
+
+Ejecutar atención dispersa con `sparsemax`:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/fase6_attention_sparsemax.yaml \
+  --output sample_outputs/attention_sparsemax.csv
+```
+
+Ejecutar atención `top-k`:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/fase6_attention_topk.yaml \
+  --attention-rule top-k \
+  --attention-top-k 2 \
+  --output sample_outputs/attention_topk.csv
+```
+
+Ejecutar atención local tipo sliding window:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/fase6_attention_local.yaml \
+  --output sample_outputs/attention_local.csv
+```
+
+Reglas de atención soportadas:
+
+```text
+softmax
+sparsemax
+entmax-1.5
+top-k
+```
+
+Solvers de atención soportados:
+
+```text
+projected-gradient
+mirror-descent
+frank-wolfe
+```
+
+Máscaras soportadas:
+
+```text
+none
+causal
+sliding-window
+block-sparse
+custom
+```
+
+#### Multi-head attention
+
+Ejecutar varias cabeceras de atención con distintos priors, gamma y temperatura:
+
+```bash
+cargo run -- multihead-attention-demo \
+  --config examples/multihead_attention.yaml \
+  --output sample_outputs/multihead_results.csv
+```
+
+El CSV resume la salida agregada y métricas de diversidad entre cabeceras:
+
+```text
+mean_pairwise_l1
+mean_pairwise_l2
+mean_pairwise_js
+```
+
+#### Cross-attention multimodal sintética
+
+El ejemplo multimodal usa alias semánticos:
+
+```yaml
+text_queries: []
+image_keys: []
+image_values: []
+```
+
+Internamente equivalen a:
+
+```yaml
+queries: []
+keys: []
+values: []
+```
+
+Ejecutar la demo:
+
+```bash
+cargo run -- attention-demo \
+  --config examples/cross_attention_multimodal.yaml \
+  --output sample_outputs/cross_attention.csv
+```
+
+La interpretación es que consultas textuales atienden a regiones visuales sintéticas representadas por embeddings pequeños.
+
+#### Agent sweep
+
+Ejecutar un barrido experimental de hiperparámetros:
+
+```bash
+cargo run -- agent-sweep \
+  --config examples/attention_sweep.yaml \
+  --output sample_outputs/attention_sweep.csv
+```
+
+El comando prueba combinaciones de:
+
+```text
+gamma
+temperature
+prior
+```
+
+Objetivos disponibles:
+
+```text
+max-entropy
+min-distance-to-prior
+max-difference-from-softmax
+min-output-shift
+balanced-tradeoff
+```
+
+Para `balanced-tradeoff`, el score combina entropía, divergencia frente a softmax, distancia al prior y desplazamiento de salida.
+
+#### Suites reproducibles
+
+Ejecutar una suite completa:
+
+```bash
+cargo run -- run-suite \
+  --suite experiments/suite.yaml \
+  --out evidence/run_001
+```
+
+La suite genera una estructura de evidencia como:
+
+```text
+evidence/run_001/
+├── manifest.json
+├── suite.yaml
+├── commands.log
+├── compute_results.csv
+├── fenchel_results.csv
+├── attention_results.csv
+├── solver_comparison.csv
+├── summary.json
+└── README.md
+```
+
+El directorio `evidence/` está ignorado por Git para evitar subir resultados generados. Si una corrida debe publicarse, conviene empaquetarla y adjuntarla como evidencia externa.
+
+#### Paralelismo determinista opcional
+
+La ejecución secuencial es el comportamiento por defecto. Para usar Rayon, compilar con la feature `parallel` y pasar `--parallel`:
+
+```bash
+cargo run --features parallel -- compute \
+  --config examples/quadratic_l1.yaml \
+  --parallel \
+  --jobs auto \
+  --output sample_outputs/compute_parallel.csv
+```
+
+Comandos con soporte de paralelismo:
+
+```text
+compute
+verify-fenchel
+compare-solvers
+attention-demo
+multihead-attention-demo
+agent-sweep
+run-suite
+profile
+```
+
+Ejemplo de suite reproducible en paralelo:
+
+```bash
+cargo run --features parallel -- run-suite \
+  --suite experiments/suite.yaml \
+  --out evidence/run_parallel_001 \
+  --parallel \
+  --jobs auto
+```
+
+Si el binario se ejecuta con `--parallel` pero fue compilado sin `--features parallel`, el CLI devuelve un error explícito indicando cómo recompilarlo.
+
+#### Profile y benchmarks
+
+Perfilar `agent-sweep` desde el CLI:
+
+```bash
+cargo run -- profile \
+  --config examples/attention_sweep.yaml \
+  --repeat 30 \
+  --output sample_outputs/profile.csv
+```
+
+Perfilar con paralelismo:
+
+```bash
+cargo run --features parallel -- profile \
+  --config examples/attention_sweep.yaml \
+  --repeat 30 \
+  --parallel \
+  --jobs auto \
+  --output sample_outputs/profile_parallel.csv
+```
+
+Ejecutar benchmarks con Criterion:
+
+```bash
+cargo bench
+```
+
+Columnas generadas por `profile`:
+
+```text
+experiment,dimension,n_queries,n_keys,solver,parallel,jobs,repeat,mean_ms,min_ms,max_ms,std_ms
+```
+
+#### Funciones convexas soportadas
+
+El proyecto soporta las siguientes funciones convexas en YAML:
+
+```text
+quadratic
+l1
+l2
+indicator-box
+indicator-simplex
+elastic-net
+huber
+hinge-loss
+logistic-loss
+max-affine
+```
+
+También existen archivos de función independientes en `examples/functions/` para comandos como `prox` y `fenchel-young`.
+
+#### Kernels soportados
+
+Kernels disponibles:
+
+```text
+squared-norm
+weighted-squared-norm
+mahalanobis
+huber
+entropy-kl
+bregman-quadratic
+bregman-entropy
+```
+
+El kernel de Mahalanobis usa la forma:
+
+```text
+g(z) = 1/2 z^T M z
+```
+
+La geometría entrópica conecta con KL, mirror descent y atención regularizada sobre el simplex.
+
+#### Fundamento matemático del kernel average
 
 El módulo convexo trabaja con dos funciones convexas `f1` y `f2`, un peso `lambda1` y un kernel `g`.
 
-##### Paso 1: pesos convexos
-
-Se define:
+Pesos convexos:
 
 ```text
 lambda1 in (0, 1)
 lambda2 = 1 - lambda1
 ```
 
-##### Paso 2: restricción de mezcla
-
-Para calcular el promedio en un punto `x`, se buscan dos puntos auxiliares `y1` y `y2` tales que:
+Restricción de mezcla:
 
 ```text
 lambda1 * y1 + lambda2 * y2 = x
 ```
 
-En el código se elimina `y2` usando:
+El código elimina `y2` usando:
 
 ```text
 y2 = (x - lambda1 * y1) / lambda2
 ```
 
-Así el problema se reduce a optimizar únicamente sobre `y1`.
-
-##### Paso 3: kernel cuadrático
-
-El software usa el kernel:
+Para el kernel cuadrático:
 
 ```text
 g(z) = 1/2 ||z||²
-```
-
-con:
-
-```text
 z = y1 - y2
 ```
-
-##### Paso 4: objetivo del kernel average
 
 El promedio kernel se calcula como:
 
@@ -252,29 +703,20 @@ P(x) = min_{y1,y2} lambda1*f1(y1)
 sujeto a: lambda1*y1 + lambda2*y2 = x
 ```
 
-El factor `c` cambia el tipo de promedio:
+El factor `c` permite comparar:
 
 ```text
-c = 0  -> promedio epigráfico
-c = 1  -> proximal/kernel average con squared-norm
+c = 0 -> promedio epigráfico
+c = 1 -> proximal/kernel average con squared-norm
 ```
 
-##### Paso 5: promedio aritmético usado para comparar
+El promedio aritmético usado como referencia es:
 
 ```text
 A(x) = lambda1*f1(x) + lambda2*f2(x)
 ```
 
-El comando `compare` imprime y exporta:
-
-```text
-A(x), E(x), P(x), P(x)-E(x), A(x)-P(x)
-```
-
-donde `E(x)` es el promedio epigráfico y `P(x)` es el proximal/kernel average.
-
-
-#### 8. Identidad de Fenchel verificada
+#### Identidad de Fenchel
 
 El comando `verify-fenchel` verifica numéricamente una identidad de dualidad:
 
@@ -288,7 +730,7 @@ El lado izquierdo se aproxima por maximización:
 sup_x <s, x> - P(f1, f2, g)(x)
 ```
 
-El lado derecho se calcula usando los conjugados analíticos disponibles:
+El lado derecho se calcula usando conjugados analíticos disponibles:
 
 ```text
 f1*, f2*, g*
@@ -301,61 +743,17 @@ g(z) = 1/2 ||z||²
 g*(s) = 1/2 ||s||²
 ```
 
-El CSV exporta el valor izquierdo aproximado, el valor derecho, error absoluto, error relativo y estado `passed`.
+El CSV exporta valor izquierdo aproximado, valor derecho, error absoluto, error relativo y estado `passed`.
 
+#### Atención regularizada como optimización
 
-#### 9. Ecuación de atención paso a paso
-
-La demo de atención representa `queries`, `keys` y `values` mediante vectores pequeños definidos en YAML.
-
-##### Paso 1: scores de atención
-
-Para una query `q` y keys `k_i`:
+Para una query `q` y keys `k_i`, el score se calcula como:
 
 ```text
 score_i = <q, k_i> / sqrt(d)
 ```
 
-donde `d` es la dimensión de los embeddings.
-
-##### Paso 2: máscara opcional
-
-Si existe máscara causal o custom, se modifica el score:
-
-```text
-masked_score_i = score_i + mask_i
-```
-
-Las posiciones bloqueadas usan:
-
-```text
--inf
-```
-
-Por tanto reciben peso cero.
-
-##### Paso 3: softmax estándar
-
-```text
-p_softmax_i = exp(masked_score_i / temperature)
-              / sum_j exp(masked_score_j / temperature)
-```
-
-##### Paso 4: prior estructural
-
-La atención regularizada usa una distribución previa `p0`.
-
-Si no se define `prior`, el software usa una distribución uniforme sobre los tokens permitidos:
-
-```text
-p0_i = 1 / n
-```
-
-Si hay máscara, el prior se renormaliza sobre posiciones permitidas.
-
-##### Paso 5: atención regularizada por kernel
-
-El problema resuelto es:
+La atención regularizada resuelve un problema sobre el simplex:
 
 ```text
 min_p  - <scores, p>
@@ -371,905 +769,98 @@ sujeto a:
 Interpretación:
 
 - `-<scores,p>` favorece tokens con score alto.
-- `temperature * sum p_i log(p_i)` produce suavidad entrópica.
+- `temperature * sum p_i log(p_i)` introduce suavidad entrópica.
 - `gamma/2 * ||p-p0||²` acerca la atención al prior estructural.
-- La restricción `sum p_i = 1` mantiene una distribución de probabilidad.
+- La restricción `sum_i p_i = 1` mantiene una distribución de probabilidad.
+- Las máscaras causales o estructuradas imponen restricciones similares a las usadas en modelos autoregresivos y atención local.
 
-##### Paso 6: salida de atención
+La salida se calcula como:
 
 ```text
 output = sum_i p_i * value_i
 ```
 
-El software calcula la salida para softmax estándar y para atención regularizada.
+#### Salidas generadas y limpieza
 
-
-#### 10. Multi-head attention
-
-El comando multi-head ejecuta varias cabeceras con diferentes parámetros:
+El repositorio ignora por defecto:
 
 ```text
-head_h = Attention(q, K, V, temperature_h, gamma_h, prior_h)
-```
-
-Luego agrega sus salidas mediante promedio simple:
-
-```text
-aggregated_output = (1/H) * sum_h output_h
-```
-
-También calcula diversidad entre cabeceras:
-
-```text
-mean_pairwise_l1
-mean_pairwise_l2
-mean_pairwise_js
-```
-
-Esto permite explicar cómo distintas cabeceras atienden a patrones diferentes.
-
-
-#### 11. Cross-attention multimodal sintética
-
-El ejemplo multimodal usa alias semánticos:
-
-```yaml
-text_queries: [...]
-image_keys: [...]
-image_values: [...]
-```
-
-Internamente equivalen a:
-
-```yaml
-queries: [...]
-keys: [...]
-values: [...]
-```
-
-La interpretación es:
-
-```text
-texto consulta regiones visuales sintéticas
-```
-
-Esto permite presentar una idea tipo MLLM sin depender todavía de un encoder real de imágenes.
-
-
-#### 12. Agent sweep
-
-El comando `agent-sweep` prueba combinaciones de:
-
-```text
-gamma
-temperature
-prior
-```
-
-Para cada configuración ejecuta la demo de atención, calcula métricas promedio y asigna un score según el objetivo.
-
-Objetivos disponibles:
-
-```text
-max-entropy
-min-distance-to-prior
-max-difference-from-softmax
-min-output-shift
-balanced-tradeoff
-```
-
-Para `balanced-tradeoff`, el score usado es:
-
-```text
-score = entropy
-        + 0.5 * js_softmax_regularized
-        - 0.5 * distance_to_prior
-        - 0.25 * output_shift
-```
-
-Interpretación: busca una atención expresiva, no demasiado alejada del prior y sin desplazar excesivamente la salida.
-
-
-#### 13. Comandos para ejecutar y explicar el software
-
-##### 13.1 Ver ayuda general
-
-```bash
-cargo run -- --help
-```
-
-##### 13.2 Ver ayuda de un subcomando
-
-```bash
-cargo run -- compute --help
-cargo run -- compare --help
-cargo run -- verify-fenchel --help
-cargo run -- attention-demo --help
-cargo run -- multihead-attention-demo --help
-cargo run -- agent-sweep --help
-```
-
-#### 14. Demostración de análisis convexo
-
-##### 14.1 Cálculo
-
-```bash
-cargo run -- compute \
-  --config examples/quadratic_l1.yaml \
-  --output results.csv
-```
-
-Explicación breve:
-
-```text
-Calcula P(x) para varios puntos x usando f1 cuadrática, f2 L1 y kernel squared-norm.
-```
-
-##### 14.2 Comparación
-
-```bash
-cargo run -- compare \
-  --config examples/compare_quadratic_l1.yaml \
-  --output comparison.csv
-```
-
-Explicación breve:
-
-```text
-Compara promedio aritmético, promedio epigráfico y proximal/kernel average.
-```
-
-##### 14.3 Verificación  Fenchel
-
-```bash
-cargo run -- verify-fenchel \
-  --config examples/fenchel_quadratic_l2.yaml \
-  --output fenchel.csv
-```
-
-Explicación breve:
-
-```text
-Verifica numéricamente una identidad primal-dual usando conjugados convexos.
-```
-
-
-#### 15. Demostración con OSQP
-
-```bash
-cargo run -- compute \
-  --config examples/quadratic_l1_osqp.yaml \
-  --output results_osqp.csv
-```
-
-```bash
-cargo run -- compare \
-  --config examples/compare_quadratic_l1_osqp.yaml \
-  --output comparison_osqp.csv
-```
-
-```bash
-cargo run -- verify-fenchel \
-  --config examples/fenchel_quadratic_l2_osqp.yaml \
-  --output fenchel_osqp.csv
-```
-
-Explicación breve:
-
-```text
-Usa OSQP como backend alternativo cuando el problema puede expresarse como QP.
-```
-
-
-#### 16. Demostración de atención, Transformers, LLM y MLLM
-
-##### 16.1 Attention demostración base
-
-```bash
-cargo run -- attention-demo \
-  --config examples/attention_demo.yaml \
-  --output attention_results.csv
-```
-
-Explicación breve:
-
-```text
-Compara softmax attention contra atención regularizada por kernel.
-```
-
-Métricas exportadas:
-
-```text
-weight_l1_distance
-weight_l2_distance
-output_l2_distance
-standard_entropy
-regularized_entropy
-kl_regularized_to_softmax
-kl_regularized_to_prior
-js_softmax_regularized
-effective_tokens_standard
-effective_tokens_regularized
-standard_top1_mass
-regularized_top1_mass
-standard_topk_mass
-regularized_topk_mass
-```
-
-##### 16.2 Attention con prior uniforme
-
-```bash
-cargo run -- attention-demo \
-  --config examples/attention_demo_uniform.yaml \
-  --output attention_uniform.csv
-```
-
-##### 16.3 Causal mask tipo LLM
-
-```bash
-cargo run -- attention-demo \
-  --config examples/attention_causal.yaml \
-  --output attention_causal.csv
-```
-
-Explicación breve:
-
-```text
-Bloquea tokens futuros. Es la conexión más directa con atención autoregresiva tipo LLM.
-```
-
-##### 16.4 Máscara personalizada
-
-```bash
-cargo run -- attention-demo \
-  --config examples/attention_custom_mask.yaml \
-  --output attention_custom_mask.csv
-```
-
-Ejemplo de máscara custom:
-
-```yaml
-mask:
-  type: custom
-  matrix:
-    - [0, "-inf", "-inf"]
-    - [0, 0, "-inf"]
-    - [0, 0, 0]
-```
-
-##### 16.5 Multi-head attention
-
-```bash
-cargo run -- multihead-attention-demo \
-  --config examples/multihead_attention.yaml \
-  --output multihead_results.csv
-```
-
-Explicación breve:
-
-```text
-Ejecuta varias cabeceras con distintos priors, gamma y temperatura.
-```
-
-##### 16.6 Cross-attention multimodal sintética
-
-```bash
-cargo run -- attention-demo \
-  --config examples/cross_attention_multimodal.yaml \
-  --output cross_attention.csv
-```
-
-Explicación breve:
-
-```text
-Simula texto atendiendo a regiones visuales representadas por embeddings pequeños.
-```
-
-##### 16.7 Agent sweep
-
-```bash
-cargo run -- agent-sweep \
-  --config examples/attention_sweep.yaml \
-  --output attention_sweep.csv
-```
-
-Explicación breve:
-
-```text
-Prueba configuraciones de atención y devuelve un ranking reproducible.
-```
-
-
-#### 17. Resultados de ejemplo para visualizar
-
-La carpeta `sample_outputs/` incluye vistas previas en CSV para enseñar capturas o explicar el formato de salida.
-
-> Importante: estos CSV son una vista previa orientativa. Para resultados definitivos, regenerarlos ejecutando los comandos con `cargo run` en tu máquina.
-
-Archivos incluidos:
-
-```text
-sample_outputs/results_preview.csv
-sample_outputs/comparison_preview.csv
-sample_outputs/attention_results_preview.csv
-sample_outputs/attention_causal_preview.csv
-sample_outputs/cross_attention_preview.csv
-sample_outputs/multihead_results_preview.csv
-sample_outputs/attention_sweep_preview.csv
-```
-
-##### 17.1 Vista previa: `compute`
-
-Comando que genera el resultado definitivo:
-
-```bash
-cargo run -- compute --config examples/quadratic_l1.yaml --output results.csv
-```
-
-Extracto visual (ejemplo):
-
-```text
-index | point                    | value        | y1                       | y2
-0     | [1.0000000000,1.0000000000] | 1.1850000143 | [0.8999023438,0.8999023438] | [1.1000976562,1.1000976562]
-1     | [2.0000000000,-1.0000000000] | 2.1516666740 | [1.5666503906,-0.8999023438] | [2.4333496094,-1.1000976562]
-2     | [0.0000000000,0.5000000000] | 0.2341666669 | [0.0000000000,0.5666503906] | [0.0000000000,0.4333496094]
-```
-
-Lectura rápida:
-
-```text
-El solver busca y1,y2 que mezclan al punto x y reducen el objetivo convexo con penalización kernel.
-```
-
-##### 17.2 Vista previa: `compare`
-
-Comando que genera el resultado definitivo:
-
-```bash
-cargo run -- compare --config examples/compare_quadratic_l1.yaml --output comparison.csv
-```
-
-Extracto visual (ejemplo):
-
-```text
-index | arithmetic | epigraphical | proximal   | arithmetic - proximal
-0     | 1.200000   | 1.155000     | 1.185000   | 0.015000
-1     | 2.300000   | 1.855000     | 2.151667   | 0.148333
-2     | 0.237500   | 0.227500     | 0.234167   | 0.003333
-3     | 2.300000   | 1.855000     | 2.151667   | 0.148333
-```
-
-Lectura rápida:
-
-```text
-El promedio proximal queda entre el epigráfico y el aritmético en estos ejemplos.
-```
-
-##### 17.3 Vista previa: `attention-demo`
-
-Comando que genera el resultado definitivo:
-
-```bash
-cargo run -- attention-demo --config examples/attention_demo.yaml --output attention_results.csv
-```
-
-Extracto visual (ejemplo):
-
-```text
-query | softmax weights                          | regularized weights                      | JS distance | effective tokens reg
-0     | [0.3463,0.1871,0.1604,0.3062]              | [0.2914,0.1920,0.1715,0.3451]            | 0.0433      | 3.8409
-1     | [0.1604,0.3464,0.2183,0.2750]              | [0.1714,0.2912,0.2141,0.3234]            | 0.0477      | 3.8830
-2     | [0.2195,0.1882,0.3762,0.2161]              | [0.2167,0.1943,0.3088,0.2803]            | 0.0614      | 3.9315
-```
-
-Lectura rápida:
-
-```text
-La regularización mueve la atención hacia el prior [0.20,0.20,0.20,0.40], aumentando la masa del cuarto token.
-```
-
-##### 17.4 Vista previa: máscara causal tipo LLM
-
-Comando que genera el resultado definitivo:
-
-```bash
-cargo run -- attention-demo --config examples/attention_causal.yaml --output attention_causal.csv
-```
-
-Extracto visual  (ejemplo):
-
-```text
-query | masked_scores                          | regularized_weights
-0     | [0.5773502692,-inf,-inf,-inf]             | [1.0000,0.0000,0.0000,0.0000]
-1     | [0.2309401077,0.5773502692,-inf,-inf]     | [0.4424,0.5576,0.0000,0.0000]
-2     | [0.1154700538,0.1732050808,0.5773502692,-inf] | [0.2894,0.3026,0.4080,0.0000]
-```
-
-Lectura rápida:
-
-```text
-La query 0 solo puede mirar el token 0; la query 1 puede mirar 0 y 1; la query 2 puede mirar 0,1,2.
-```
-
-##### 17.5 Vista previa: cross-attention multimodal
-
-Comando que genera el resultado definitivo:
-
-```bash
-cargo run -- attention-demo --config examples/cross_attention_multimodal.yaml --output cross_attention.csv
-```
-
-Extracto visual (ejemplo):
-
-```text
-query | regularized_weights                      | regularized_output
-0     | [0.2825,0.2238,0.1973,0.2964]              | [0.4307,0.3720,0.3455]
-1     | [0.1916,0.2064,0.2920,0.3099]              | [0.3466,0.3614,0.4470]
-```
-
-Lectura rápida:
-
-```text
-Los tokens textuales atienden a regiones visuales sintéticas; el prior favorece la región global.
-```
-
-##### 17.6 Vista previa: multi-head attention
-
-Comando que genera el resultado definitivo:
-
-```bash
-cargo run -- multihead-attention-demo --config examples/multihead_attention.yaml --output multihead_results.csv
-```
-
-Extracto visual (ejemplo):
-
-```text
-query | aggregated_output     | average_entropy | mean_pairwise_js
-0     | [0.6371,0.5446]      | 1.3605          | 0.0572
-1     | [0.5352,0.6363]      | 1.3688          | 0.0485
-```
-
-Lectura rápida:
-
-```text
-Cada cabecera produce una distribución distinta; el CSV resume salida agregada y diversidad entre cabeceras.
-```
-
-##### 17.7 Vista previa: agent sweep
-
-Comando que genera el resultado definitivo:
-
-```bash
-cargo run -- agent-sweep --config examples/attention_sweep.yaml --output attention_sweep.csv
-```
-
-Extracto visual (ejemplo):
-
-```text
-rank | gamma | temperature | prior_name | score   | mean_effective_tokens
-1    | 2.0   | 1.5         | uniform    | 1.3297  | 3.9742
-2    | 1.0   | 1.5         | uniform    | 1.3192  | 3.9665
-3    | 0.5   | 1.5         | uniform    | 1.3126  | 3.9612
-4    | 2.0   | 1.0         | uniform    | 1.3099  | 3.9544
-```
-
-Lectura rápida:
-
-```text
-El agente experimental ordena configuraciones según el objetivo balanced-tradeoff.
-```
-
-> La principal contribución del MVP es tender un puente entre teoría convexa y mecanismos de inteligencia artificial. La atención regularizada
-> implementada en el software permite reinterpretar una parte central de los Transformers como un problema de optimización: los pesos de atención no se calculan únicamente a partir de compatibilidades entre vectores, sino que también pueden incorporar priors, restricciones, máscaras y regularización.
-
-Esta perspectiva es relevante porque muchos sistemas modernos de IA combinan aprendizaje estadístico con restricciones estructurales. En LLMs, las máscaras causales imponen una estructura temporal, en MLLMs, la cross-attention conecta modalidades distintas y en agentes, la selección de configuraciones puede verse como un proceso de búsqueda guiada por métricas. KAvgLab no pretende reemplazar frameworks de deep learning, sino ofrecer un entorno pequeño, transparente y matemáticamente interpretable para estudiar estas ideas desde la optimización convexa.
-
-#### 16. Fase 1: profesionalización del CLI sin cambiar su esencia
-
-Esta versión conserva a KAvgLab como una herramienta de línea de comandos. La mejora principal no es visual, sino de ingeniería: estructura de repositorio más profesional, validación automática en GitHub Actions y trazabilidad de ejecuciones.
-
-##### 16.1 Estructura agregada
-
-```text
-.github/workflows/ci.yml
-CHANGELOG.md
-CONTRIBUTING.md
-SECURITY.md
-docs/fase-1-profesionalizacion-cli.md
-experiments/README.md
-sample_outputs/README.md
-LICENSE
-```
-
-##### 16.2 Validación local antes de subir a GitHub
-
-Como el proyecto se trabaja localmente y ya existe en GitHub, el flujo recomendado es crear una rama en español, sin prefijos como `feat`:
-
-```bash
-git switch -c fase-1-profesionalizacion-cli
-cargo fmt -- --check
-cargo check --all-targets
-cargo clippy --all-targets -- -D warnings
-cargo test --all-targets
-cargo build --release
-git status
-```
-
-Si todo pasa correctamente:
-
-```bash
-git add .
-git commit -m "Agrega fase 1 de profesionalizacion del CLI"
-git push -u origin fase-1-profesionalizacion-cli
-```
-
-Luego se abre un Pull Request hacia `main`.
-
-##### 16.3 Salida CSV, JSON y manifiesto
-
-La salida CSV anterior se mantiene. Además, `compute` puede generar JSON estructurado y un manifiesto de ejecución:
-
-```bash
-cargo run -- compute   --config examples/quadratic_l1.yaml   --output sample_outputs/results.csv   --json sample_outputs/results.json   --manifest sample_outputs/manifest.json
-```
-
-Cuando el binario está instalado o compilado en release:
-
-```bash
-./target/release/kavg-lab compute   --config examples/quadratic_l1.yaml   --output sample_outputs/results.csv   --json sample_outputs/results.json   --manifest sample_outputs/manifest.json
-```
-
-El archivo CSV sirve para análisis tabular. El JSON sirve para auditoría automática. El manifiesto registra versión del binario, comando ejecutado, ruta de configuración, hash FNV-1a de la configuración, cantidad de resultados y duración de ejecución.
-
-##### 16.4 Artefactos generados que no se deben subir
-
-Por defecto, `.gitignore` evita subir resultados generados en `sample_outputs/`:
-
-```text
+/target
+*.csv
 sample_outputs/*.csv
 sample_outputs/*.json
+/evidence/
 ```
 
-El archivo que sí se mantiene versionado es `sample_outputs/README.md`, porque documenta la convención de salidas.
+Esto evita subir binarios, resultados temporales y paquetes de evidencia generados localmente.
 
-##### 16.5 CI en GitHub
+Para limpiar resultados temporales comunes:
 
-El workflow `.github/workflows/ci.yml` ejecuta:
+```bash
+rm -rf target
+rm -rf evidence
+find . -name "*.csv" -not -path "./sample_outputs/README.md" -delete
+find sample_outputs -name "*.json" -delete
+```
+
+Revisar antes de confirmar cambios:
+
+```bash
+git status
+git diff -- README.md Cargo.toml .github/workflows/ci.yml
+```
+
+#### Fases implementadas o reflejadas en el proyecto
+
+| Fase | Estado reflejado | Evidencia principal |
+|---|---|---|
+| Fase 1 | Profesionalización del CLI | CI, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`, JSON y manifiesto en `compute` |
+| Fase 2 | Matemática convexa ampliada | Funciones convexas y kernels adicionales en `src/functions/`, `src/kernels/` y ejemplos `fase2_*.yaml` |
+| Fase 3 | Solvers y comparación algorítmica | `compare-solvers`, solvers convexos y solvers de atención |
+| Fase 4 | Experimentación reproducible | `run-suite`, `experiments/suite.yaml`, paquetes en `evidence/` |
+| Fase 5 | Paralelismo determinista | `src/parallel.rs`, feature `parallel`, flags `--parallel` y `--jobs` |
+| Fase 6 | Atención dispersa | `sparsemax`, `entmax-1.5`, `top-k`, `sliding-window`, `block-sparse` |
+| Fase 7 | Matemática convexa auditable | `prox`, `fenchel-young`, `bregman-entropy` |
+| Fase 8 | Pruebas de propiedades y benchmarking | `proptest`, `benches/`, `profile` |
+
+Observación importante: los documentos individuales en `docs/` cubren formalmente las fases 1 a 4. Las fases posteriores están reflejadas en código, ejemplos, tests, benchmarks y el registro de cambios, aunque no todas tienen todavía un documento independiente en `docs/`.
+
+#### Flujo recomendado con ramas y Pull Request
+
+Crear una rama para ordenar documentación:
+
+```bash
+git switch -c fase-documentacion-readme-ordenado
+```
+
+Reemplazar `README.md` y validar:
 
 ```bash
 cargo fmt -- --check
 cargo check --all-targets
 cargo clippy --all-targets -- -D warnings
 cargo test --all-targets
-cargo build --release
 ```
 
-Esto permite que cada `push` a `main` y cada Pull Request validen que el CLI compila, mantiene formato, pasa pruebas y genera un binario release.
-
-#### Fase 2: matemática convexa ampliada
-
-La Fase 2 mantiene el proyecto como CLI, pero amplía el núcleo matemático. Además de `quadratic`, `l1`, `l2` y `squared-norm`, se agregan funciones convexas y kernels para experimentar con restricciones, regularización, pérdidas de aprendizaje automático y geometrías no euclidianas.
-
-Funciones convexas adicionales:
-
-```text
-indicator-box
-indicator-simplex
-elastic-net
-huber
-hinge-loss
-logistic-loss
-max-affine
-```
-
-Kernels adicionales:
-
-```text
-weighted-squared-norm
-mahalanobis
-huber
-entropy-kl
-bregman-quadratic
-```
-
-Ejemplo con elastic net, caja y Mahalanobis:
+Confirmar cambios:
 
 ```bash
-cargo run -- compute \
-  --config examples/fase2_elastic_box_mahalanobis.yaml \
-  --output sample_outputs/fase2_results.csv \
-  --json sample_outputs/fase2_results.json \
-  --manifest sample_outputs/fase2_manifest.json
+git add README.md
+git commit -m "Ordena README segun estado actual del proyecto"
+git push -u origin fase-documentacion-readme-ordenado
 ```
 
-El kernel de Mahalanobis usa la forma:
+Abrir un Pull Request hacia `main` y esperar que el CI pase antes de fusionar.
 
-```text
-g(z) = 1/2 z^T M z
-```
+#### Alcance y limitaciones
 
-Esto permite estudiar geometrías distintas a la euclidiana, útiles para embeddings, métricas aprendidas, atención regularizada y optimización convexa.
+KAvgLab es un laboratorio CLI de optimización convexa y atención regularizada, no como un framework de deep learning completo. Su valor está en que cada resultado se obtiene desde configuraciones YAML pequeñas, comandos reproducibles y salidas auditables.
 
-#### Fase 3: solvers más fuertes y comparación algorítmica
+El proyecto es adecuado para:
 
-La Fase 3 mantiene el proyecto como CLI puro y agrega métodos de optimización adicionales para estudiar el comportamiento algorítmico de los promedios kernel y la atención regularizada.
+- experimentos reproducibles sobre promedios kernel,
+- comparación de solvers,
+- demostraciones interpretables de atención regularizada,
+- conexión conceptual entre optimización, Transformers, LLMs, MLLMs y agentes.
 
-Solvers convexos nuevos:
-
-```text
-proximal-gradient
-fista
-admm
-```
-
-Solvers de atención sobre simplex:
-
-```text
-projected-gradient
-mirror-descent
-frank-wolfe
-```
-
-La atención regularizada trabaja sobre distribuciones de probabilidad, por lo que los pesos deben cumplir:
-
-```text
-p_i >= 0
-sum_i p_i = 1
-```
-
-Por ello, `mirror-descent` y `frank-wolfe` son especialmente útiles para estudiar geometría del simplex, dispersión de pesos y estabilidad frente al prior.
-
-Ejemplo de atención con mirror descent:
-
-```bash
-cargo run -- attention-demo \
-  --config examples/attention_demo.yaml \
-  --solver mirror-descent \
-  --output sample_outputs/attention_mirror.csv
-```
-
-Ejemplo de comparación de solvers:
-
-```bash
-cargo run -- compare-solvers \
-  --config examples/fase3_compare_solvers.yaml \
-  --solvers coordinate-descent,subgradient,osqp,proximal-gradient,fista \
-  --output sample_outputs/solver_comparison.csv
-```
-
-El comando `compare-solvers` convierte el proyecto en un laboratorio CLI para comparar valor objetivo, iteraciones, métrica del solver y estado de cada método sobre los mismos puntos de entrada.
-
-#### Fase 4: suites reproducibles desde CLI
-
-KAvgLab puede ejecutar una suite experimental completa sin dashboard ni servidor web. El comando `run-suite` recibe un YAML declarativo y genera un paquete de evidencia con metadatos, comandos equivalentes y resultados tabulares.
-
-```bash
-kavg-lab run-suite \
-  --suite experiments/suite.yaml \
-  --out evidence/run_001
-```
-
-La estructura generada es:
-
-```text
-evidence/run_001/
-├── manifest.json
-├── suite.yaml
-├── commands.log
-├── compute_results.csv
-├── fenchel_results.csv
-├── attention_results.csv
-├── solver_comparison.csv
-├── summary.json
-└── README.md
-```
-
-El archivo `manifest.json` registra la versión de `kavg-lab`, `rustc`, hora de inicio y fin, hash de configuración, commit Git detectado y estado final. El archivo `commands.log` deja los comandos CLI equivalentes a cada paso de la suite.
-
-El directorio `evidence/` está ignorado por Git para evitar subir artefactos de ejecución. Si se desea publicar una corrida, conviene empaquetarla o adjuntarla explícitamente como evidencia externa.
-
-
-#### Fase 5: paralelismo determinista opcional
-
-KAvgLab mantiene ejecución secuencial por defecto, pero puede compilarse con una feature opcional de paralelismo basada en Rayon:
-
-```bash
-cargo run --features parallel -- compute \
-  --config examples/quadratic_l1.yaml \
-  --parallel \
-  --jobs auto \
-  --output sample_outputs/compute_parallel.csv
-```
-
-Comandos con soporte `--parallel`:
-
-```text
-compute
-verify-fenchel
-compare-solvers
-attention-demo
-multihead-attention-demo
-agent-sweep
-run-suite
-```
-
-Ejemplo de comparación de solvers en paralelo:
-
-```bash
-cargo run --features parallel -- compare-solvers \
-  --config examples/fase3_compare_solvers.yaml \
-  --solvers coordinate-descent,subgradient,osqp,proximal-gradient,fista \
-  --parallel \
-  --jobs auto \
-  --output sample_outputs/solver_comparison.csv
-```
-
-Ejemplo de suite reproducible paralela:
-
-```bash
-cargo run --features parallel -- run-suite \
-  --suite experiments/suite.yaml \
-  --out evidence/run_parallel_001 \
-  --parallel \
-  --jobs auto
-```
-
-Si el binario se ejecuta con `--parallel` pero fue compilado sin `--features parallel`, el CLI devuelve un error explícito indicando cómo recompilarlo.
-
-#### Fase 6: atención dispersa y optimización regularizada
-
-KAvgLab incorpora mecanismos de atención dispersa para estudiar la atención como un problema de optimización regularizada sobre el simplex, sin convertir el proyecto en un LLM completo.
-
-Reglas soportadas:
-
-- `softmax`
-- `sparsemax`
-- `entmax-1.5`
-- `top-k`
-
-Máscaras estructuradas adicionales:
-
-- `causal`
-- `sliding-window`
-- `block-sparse`
-- `custom`
-
-Ejemplo con sparsemax:
-
-```bash
-cargo run -- attention-demo \
-  --config examples/fase6_attention_sparsemax.yaml \
-  --output sample_outputs/attention_sparsemax.csv
-```
-
-Ejemplo con top-k sparse attention:
-
-```bash
-cargo run -- attention-demo \
-  --config examples/fase6_attention_topk.yaml \
-  --attention-rule top-k \
-  --attention-top-k 2 \
-  --output sample_outputs/attention_topk.csv
-```
-
-Ejemplo con atención local tipo sliding window:
-
-```bash
-cargo run -- attention-demo \
-  --config examples/fase6_attention_local.yaml \
-  --output sample_outputs/attention_local.csv
-```
-
-La fase también agrega `src/optimization/projections.rs` con operadores de proyección para simplex, top-k simplex y una proyección de Dykstra básica para intersecar caja y simplex.
-
-#### Fase 7: matemática convexa auditable
-
-La Fase 7 agrega comandos pequeños para verificar propiedades matemáticas y calcular operadores fundamentales de optimización convexa. El objetivo es hacer que KAvgLab sea más auditable sin dejar de ser un CLI.
-
-##### Operadores proximales
-
-```bash
-cargo run -- prox \
-  --function examples/functions/l1.yaml \
-  --point "[1.0,-2.0,0.5]" \
-  --step 0.1 \
-  --moreau
-```
-
-Casos soportados inicialmente:
-
-- `l1`: soft-thresholding.
-- `l2`: shrinkage.
-- `elastic-net`: soft-thresholding con contracción L2.
-- `indicator-box`: proyección a caja.
-- `indicator-simplex`: proyección al simplex.
-
-##### Fenchel-Young
-
-```bash
-cargo run -- fenchel-young \
-  --function examples/functions/l1.yaml \
-  --x "[1.0,-2.0,0.5]" \
-  --s "[0.2,-0.1,0.3]"
-```
-
-El comando reporta:
-
-- `f(x)`
-- `f*(s)`
-- `<x,s>`
-- `gap = f(x)+f*(s)-<x,s>`
-- `relative_gap`
-- `passed`
-
-##### Geometría Bregman entrópica
-
-Además de los kernels anteriores, se agrega `bregman-entropy` como divergencia de Bregman inducida por entropía negativa. Esta geometría conecta con KL, mirror descent y atención regularizada sobre simplex.
-
-```yaml
-kernel:
-  type: bregman-entropy
-  reference: [1.0, 1.0, 1.0]
-  epsilon: 1.0e-12
-```
-
-#### Fase 8: pruebas de propiedades y benchmarking CLI
-
-La Fase 8 cierra el proyecto con verificación generativa y medición de rendimiento sin agregar dashboard. Se incorporan pruebas basadas en propiedades con `proptest`, benchmarks con Criterion y un comando CLI liviano para perfilar `agent-sweep`.
-
-##### Property-based testing
-
-La suite agrega pruebas que generan entradas automáticamente y verifican invariantes generales:
-
-- pesos de atención y proyecciones sobre simplex suman 1,
-- pesos son no negativos,
-- top-k sparse attention deja como máximo `k` entradas positivas,
-- kernels cuadráticos no producen valores negativos bajo geometrías válidas,
-- resultados secuenciales/paralelos preservan cantidad y orden lógico.
-
-```bash
-cargo test --all-targets
-cargo test --all-targets --features parallel
-```
-
-##### Benchmarks sin dashboard
-
-Los benchmarks usan Criterion y se ejecutan con:
-
-```bash
-cargo bench
-```
-
-En CI se compilan con:
-
-```bash
-cargo bench --no-run
-```
-
-##### Comando profile
-
-`profile` mide una suite `agent-sweep` varias veces y exporta estadísticas en CSV:
-
-```bash
-cargo run -- profile \
-  --config examples/attention_sweep.yaml \
-  --repeat 30 \
-  --output sample_outputs/profile.csv
-```
-
-Con paralelismo:
-
-```bash
-cargo run --features parallel -- profile \
-  --config examples/attention_sweep.yaml \
-  --repeat 30 \
-  --parallel \
-  --jobs auto \
-  --output sample_outputs/profile_parallel.csv
-```
-
-Columnas generadas:
-
-```text
-experiment,dimension,n_queries,n_keys,solver,parallel,jobs,repeat,mean_ms,min_ms,max_ms,std_ms
-```
+No pretende reemplazar a PyTorch, JAX, Hugging Face Transformers ni frameworks industriales de entrenamiento de modelos.
