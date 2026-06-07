@@ -1,5 +1,13 @@
 ### KAvgLab
 
+[![CI](https://github.com/kapumota/kavg-lab/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kapumota/kavg-lab/actions/workflows/ci.yml)
+![version](https://img.shields.io/badge/version-0.12.0-orange)
+[![license](https://img.shields.io/github/license/kapumota/kavg-lab)](LICENSE)
+![Rust](https://img.shields.io/badge/Rust-stable-orange?logo=rust)
+![validation](https://img.shields.io/badge/validation-fmt%20%2B%20clippy%20%2B%20tests-brightgreen)
+![benchmarks](https://img.shields.io/badge/benchmarks-criterion-blue)
+![demo](https://img.shields.io/badge/demo-CLI%20YAML-blue)
+
 KAvgLab es un CLI desarrollado en Rust para experimentar con promedios kernel de funciones convexas, verificación numérica de identidades de Fenchel, comparación de promedios convexos, operadores proximales, solvers de optimización y demostraciones de atención inspiradas en Transformers, LLMs, MLLMs y sistemas de agentes.
 
 El fundamento matemático principal proviene del trabajo **[The kernel average for two convex functions and its application to the extension and representation of monotone operators](https://optimization-online.org/wp-content/uploads/2007/05/1658.pdf)**, de Heinz H. Bauschke y Xianfu Wang. La idea central es combinar funciones convexas mediante una función kernel, lo que permite recuperar y comparar promedios como el promedio aritmético, el promedio epigráfico y el promedio proximal.
@@ -27,6 +35,29 @@ El proyecto ya incluye:
 - Paralelismo determinista opcional con la feature `parallel`.
 - Pruebas unitarias, pruebas de integración, property-based testing y benchmarks.
 - CI en GitHub Actions para formato, compilación, Clippy, pruebas, build release, feature `parallel` y compilación de benchmarks.
+- Validación reproducible centralizada en `scripts/validate.sh` y expuesta mediante `make validate`.
+
+#### Validación del software mediante badges
+
+Los badges superiores no reemplazan a las pruebas. Funcionan como una entrada visual al estado técnico del proyecto:
+
+| Badge | Evidencia asociada | Archivo o comando relacionado |
+|---|---|---|
+| `CI` | El workflow de GitHub Actions pasa sobre `main` | `.github/workflows/ci.yml` |
+| `version` | Versión del paquete Rust | `Cargo.toml` |
+| `license` | Licencia del proyecto | `LICENSE` |
+| `Rust` | Lenguaje y toolchain esperado | `rust-toolchain.toml` |
+| `validation` | Formato, compilación, Clippy y pruebas | `scripts/validate.sh` |
+| `benchmarks` | Compilación de benchmarks Criterion | `cargo bench --no-run` |
+| `demo` | Ejecución como CLI reproducible con YAML | `examples/` y `experiments/suite.yaml` |
+
+La validación principal debe poder ejecutarse localmente con:
+
+```bash
+make validate
+```
+
+El badge de CI queda conectado al workflow real. Si `scripts/validate.sh` falla, el workflow falla y el badge deja de indicar un estado correcto.
 
 #### Convenciones del proyecto
 
@@ -69,6 +100,7 @@ kavg-lab/
 │   ├── simplex_projection_bench.rs
 │   └── sweep_bench.rs
 ├── docs/
+│   ├── VALIDATION.md
 │   ├── fase-1-profesionalizacion-cli.md
 │   ├── fase-2-matematica-convexa.md
 │   ├── fase-3-solvers-algoritmos.md
@@ -92,6 +124,8 @@ kavg-lab/
 │   └── suite.yaml
 ├── sample_outputs/
 │   └── README.md
+├── scripts/
+│   └── validate.sh
 ├── src/
 │   ├── attention/
 │   ├── fenchel/
@@ -118,6 +152,7 @@ kavg-lab/
 ├── CONTRIBUTING.md
 ├── Cargo.lock
 ├── Cargo.toml
+├── Makefile
 ├── LICENSE
 ├── README.md
 ├── SECURITY.md
@@ -192,46 +227,45 @@ dir Cargo.toml
 Antes de presentar, abrir un Pull Request o fusionar a `main`, ejecutar desde la raíz del proyecto:
 
 ```bash
+make validate
+```
+
+Este comando llama a `scripts/validate.sh` y ejecuta la ruta completa de validación:
+
+```text
+formato -> compilación -> Clippy -> pruebas -> build release -> feature parallel -> benchmarks
+```
+
+También se puede ejecutar el script directamente:
+
+```bash
+bash scripts/validate.sh
+```
+
+Validación manual equivalente:
+
+```bash
 cargo fmt -- --check
 cargo check --all-targets
 cargo clippy --all-targets -- -D warnings
 cargo test --all-targets
 cargo build --release
-```
-
-Validación con paralelismo opcional:
-
-```bash
 cargo check --all-targets --features parallel
 cargo clippy --all-targets --features parallel -- -D warnings
 cargo test --all-targets --features parallel
 cargo build --release --features parallel
-```
-
-Compilación de benchmarks:
-
-```bash
 cargo bench --no-run
 ```
 
 #### CI en GitHub Actions
 
-El workflow `.github/workflows/ci.yml` ejecuta validaciones sobre `main` y sobre Pull Requests:
+El workflow `.github/workflows/ci.yml` ejecuta la misma validación centralizada que se usa localmente:
 
-```text
-cargo fmt -- --check
-cargo check --all-targets
-cargo clippy --all-targets -- -D warnings
-cargo test --all-targets
-cargo build --release
-cargo check --all-targets --features parallel
-cargo clippy --all-targets --features parallel -- -D warnings
-cargo test --all-targets --features parallel
-cargo build --release --features parallel
-cargo bench --no-run
+```bash
+bash scripts/validate.sh
 ```
 
-Esto permite demostrar que el proyecto compila, mantiene formato, pasa pruebas, respeta Clippy y soporta la feature opcional `parallel`.
+Esto permite demostrar que el proyecto compila, mantiene formato, pasa pruebas, respeta Clippy, soporta la feature opcional `parallel` y compila benchmarks. El badge de CI del README se actualiza a partir del resultado de este workflow.
 
 #### Uso rápido
 
@@ -797,10 +831,16 @@ Esto evita subir binarios, resultados temporales y paquetes de evidencia generad
 Para limpiar resultados temporales comunes:
 
 ```bash
+make clean
+```
+
+Comandos equivalentes:
+
+```bash
 rm -rf target
 rm -rf evidence
-find . -name "*.csv" -not -path "./sample_outputs/README.md" -delete
-find sample_outputs -name "*.json" -delete
+find . -type f -name "*.csv" -delete
+find sample_outputs -type f -name "*.json" -delete
 ```
 
 Revisar antes de confirmar cambios:
@@ -836,10 +876,7 @@ git switch -c fase-documentacion-readme-ordenado
 Reemplazar `README.md` y validar:
 
 ```bash
-cargo fmt -- --check
-cargo check --all-targets
-cargo clippy --all-targets -- -D warnings
-cargo test --all-targets
+make validate
 ```
 
 Confirmar cambios:
