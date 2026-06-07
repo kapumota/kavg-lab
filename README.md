@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/kapumota/kavg-lab/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kapumota/kavg-lab/actions/workflows/ci.yml)
 ![version](https://img.shields.io/badge/version-0.12.0-orange)
-[![license](https://img.shields.io/github/license/kapumota/kavg-lab)](LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 ![Rust](https://img.shields.io/badge/Rust-stable-orange?logo=rust)
 ![validation](https://img.shields.io/badge/validation-fmt%20%2B%20clippy%20%2B%20tests-brightgreen)
 ![benchmarks](https://img.shields.io/badge/benchmarks-criterion-blue)
